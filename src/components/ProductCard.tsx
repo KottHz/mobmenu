@@ -204,7 +204,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
       clearTimeout(resizeTimeout);
       window.removeEventListener('resize', handleResize);
     };
-  }, [description1, description2, title, isExpanded]);
+  }, [description1, description2, fullDescription, title, isExpanded]);
 
   // Preload da imagem quando estiver visível ou próxima
   useEffect(() => {
@@ -275,8 +275,23 @@ const ProductCard: React.FC<ProductCardProps> = ({
             <div className="product-text-wrapper">
               <div className="product-text-content readmore" ref={textContentRef}>
                 <h3 className="product-title" onClick={handleProductClick}>{title}</h3>
+                {/* Se houver description1 ou description2, mostrar eles (comportamento antigo) */}
                 {description1 && <p className="product-description" onClick={handleProductClick}>{description1}</p>}
                 {description2 && <p className="product-description" onClick={handleProductClick}>{description2}</p>}
+                
+                {/* Se não houver description1/description2 mas houver fullDescription, mostrar prévia */}
+                {!description1 && !description2 && fullDescription && !isExpanded && (
+                  <div className="product-description-preview">
+                    {fullDescription.split('\n').filter(line => line.trim()).slice(0, 2).map((line, index) => (
+                      <p key={index} className="product-description" onClick={handleProductClick}>{line}</p>
+                    ))}
+                    {fullDescription.split('\n').filter(line => line.trim()).length > 2 && (
+                      <p className="product-description" onClick={handleProductClick}>...</p>
+                    )}
+                  </div>
+                )}
+                
+                {/* Quando expandido, mostrar fullDescription completo */}
                 {isExpanded && fullDescription && (
                   <div className="product-full-description">
                     {fullDescription.split('\n').map((line, index) => (

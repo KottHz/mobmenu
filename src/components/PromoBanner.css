@@ -3,9 +3,15 @@
   padding: 15px 16px;
   text-align: center;
   width: 100%;
+  min-width: 400px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  transition: opacity 0.3s ease, max-height 0.3s ease, padding 0.3s ease, margin 0.3s ease;
+  transition: opacity 0.3s ease, max-height 0.3s ease, padding 0.3s ease, margin 0.3s ease, min-height 0.3s ease;
   overflow: hidden;
+  min-height: calc(16px * 1.4 + 30px); /* Altura mínima baseada no texto padrão (font-size * line-height + padding) */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
 }
 
 .promo-text {
@@ -14,6 +20,12 @@
   text-transform: uppercase;
   letter-spacing: 1px;
   margin: 0;
+  line-height: 1.4;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  pointer-events: auto;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 /* Gradiente animado (quando .with-gradient está ativo) */

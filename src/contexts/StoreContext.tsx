@@ -42,6 +42,7 @@ interface StoreContextType {
   loading: boolean;
   reloadCustomizations: () => Promise<void>;
   loadStoreByAdminUser: (userId: string) => Promise<void>;
+  reloadStore: () => Promise<void>;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -400,8 +401,46 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const reloadStore = async () => {
+    if (!store?.id) return;
+    
+    try {
+      console.log('🔄 [StoreContext] Recarregando dados da loja:', store.id);
+      const { data: storeData, error: storeError } = await supabase
+        .from('stores')
+        .select('*')
+        .eq('id', store.id)
+        .single();
+
+      if (storeError || !storeData) {
+        console.error('❌ [StoreContext] Erro ao recarregar loja:', storeError);
+        return;
+      }
+
+      const updatedStore: Store = {
+        id: storeData.id,
+        name: storeData.name,
+        slug: storeData.slug,
+        subdomain: storeData.subdomain,
+        ownerEmail: storeData.owner_email,
+        ownerName: storeData.owner_name,
+        subscriptionStatus: storeData.subscription_status,
+        description: storeData.description || undefined,
+        address: storeData.address || undefined,
+        openingHours: storeData.opening_hours || undefined,
+        closingTime: storeData.closing_time || undefined,
+        paymentMethods: storeData.payment_methods ? (Array.isArray(storeData.payment_methods) ? storeData.payment_methods : JSON.parse(storeData.payment_methods)) : undefined,
+      };
+
+      setStore(updatedStore);
+      console.log('✅ [StoreContext] Loja recarregada com sucesso');
+    } catch (error: any) {
+      console.error('❌ [StoreContext] Erro ao recarregar loja:', error);
+    }
+  };
+
   return (
-    <StoreContext.Provider value={{ store, loading, reloadCustomizations, loadStoreByAdminUser }}>
+    <StoreContext.Provider value={{ store, loading, reloadCustomizations, loadStoreByAdminUser, reloadStore }}>
       {children}
     </StoreContext.Provider>
   );

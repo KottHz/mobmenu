@@ -59,11 +59,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           </Link>
           <Link to="/admin/produtos" className={isActive('/admin/produtos')} onClick={closeSidebar}>
             <span className="nav-icon">🛍️</span>
-            Produtos
-          </Link>
-          <Link to="/admin/secoes" className={isActive('/admin/secoes')} onClick={closeSidebar}>
-            <span className="nav-icon">📑</span>
-            Seções
+            Produtos/Seções
           </Link>
           <Link to="/admin/personalizacao" className={isActive('/admin/personalizacao')} onClick={closeSidebar}>
             <span className="nav-icon">🎨</span>
