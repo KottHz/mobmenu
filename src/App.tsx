@@ -15,6 +15,7 @@ import AdminDashboard from './pages/admin/Dashboard';
 import AdminProducts from './pages/admin/Products';
 import AdminSections from './pages/admin/Sections';
 import AdminCustomization from './pages/admin/Customization';
+import AdminPersonalization from './pages/admin/Personalization';
 import AdminSettings from './pages/admin/Settings';
 import ProtectedRoute from './components/ProtectedRoute';
 import { useAuth } from './contexts/AuthContext';
@@ -195,7 +196,7 @@ function App() {
           path="/admin/personalizacao"
           element={
             <ProtectedRoute>
-              <AdminCustomization />
+              <AdminPersonalization />
             </ProtectedRoute>
           }
         />

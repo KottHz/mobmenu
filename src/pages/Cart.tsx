@@ -3,8 +3,10 @@ import { useCart } from '../contexts/CartContext';
 import { useSearch } from '../contexts/SearchContext';
 import { useStoreNavigation } from '../hooks/useStoreNavigation';
 import { getAllProducts, type Product } from '../services/productService';
-import { productImages } from '../data/products';
+import { getProductImage } from '../utils/imageHelper';
 import { formatPrice } from '../utils/priceFormatter';
+import { formatSelectedOptions } from '../utils/formatSelectedOptions';
+import { formatProductTotalPrice } from '../utils/calculateProductPrice';
 import trashIcon from '../icons/trash-svgrepo-com.svg';
 import addIcon from '../icons/add-ellipse-svgrepo-com.svg';
 import addIconGreen from '../icons/addicon.svg';
@@ -12,12 +14,13 @@ import './Cart.css';
 
 function Cart() {
   const { navigate } = useStoreNavigation();
-  const { getItemQuantity, addToCart, removeFromCart } = useCart();
+  const { getItemQuantity, addToCart, removeFromCart, cartItems } = useCart();
   const { searchTerm } = useSearch();
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [removingItems, setRemovingItems] = useState<Set<string>>(new Set());
   const [animatingQuantities, setAnimatingQuantities] = useState<Set<string>>(new Set());
+  const [observations, setObservations] = useState('');
 
   // Garantir que a página sempre abre no topo
   useLayoutEffect(() => {
@@ -176,8 +179,12 @@ function Cart() {
             {cartProducts.map((product) => {
               const quantity = getItemQuantity(product.id);
               const isRemoving = removingItems.has(product.id);
-              // Tentar usar a imagem do productImages se disponível, senão usar a URL direta
-              const productImage = productImages[product.image] || product.image || productImages.product1;
+              // Usar a função getProductImage para obter a imagem corretamente
+              const productImage = getProductImage(product.image);
+              
+              // Buscar opções selecionadas para este produto
+              const cartItem = cartItems.find((item) => item.productId === product.id);
+              const selectedOptionsText = formatSelectedOptions(product, cartItem?.selectedOptions);
               
               return (
                 <div key={product.id} className={`cart-item ${isRemoving ? 'removing' : ''}`}>
@@ -190,11 +197,18 @@ function Cart() {
                     <div className="cart-title-wrapper">
                       <h3 className="cart-item-title">{product.title}</h3>
                     </div>
+                    {selectedOptionsText && (
+                      <div className="cart-item-options">
+                        <span className="cart-options-text">{selectedOptionsText}</span>
+                      </div>
+                    )}
                     <div className="cart-item-price">
                       {product.hasDiscount && product.oldPrice && product.oldPrice.trim() !== '' && product.oldPrice !== product.newPrice && (
                         <span className="cart-price-old">{formatPrice(product.oldPrice)}</span>
                       )}
-                      <span className="cart-price-new">{formatPrice(product.newPrice)}</span>
+                      <span className="cart-price-new">
+                        {formatProductTotalPrice(product, cartItem?.selectedOptions)}
+                      </span>
                     </div>
                     <div className="cart-item-quantity">
                       <span className="quantity-label">Quantidade:</span>
@@ -222,20 +236,32 @@ function Cart() {
             })}
           </div>
         </div>
-        <div className="cart-add-button-container">
+
+        {/* Observações */}
+        <div className="cart-observations">
+          <h3 className="cart-section-title">Observações?</h3>
+          <input
+            type="text"
+            className="cart-observations-input"
+            placeholder="Observações sobre o pedido"
+            value={observations}
+            onChange={(e) => setObservations(e.target.value)}
+          />
+        </div>
+
+        {/* Botões */}
+        <div className="cart-buttons-container">
           <button className="cart-add-button" onClick={handleBackClick}>
             <img src={addIconGreen} alt="Adicionar" className="cart-add-icon" />
             Adicionar
           </button>
+          <button className="cart-finish-button" onClick={handleFinishOrder}>
+            <div className="cart-finish-content">
+              <span>Finalizar pedido</span>
+            </div>
+          </button>
         </div>
       </main>
-      <div className="cart-finish-button-container">
-        <button className="cart-finish-button" onClick={handleFinishOrder}>
-          <div className="cart-finish-content">
-            <span>Finalizar pedido</span>
-          </div>
-        </button>
-      </div>
     </>
   );
 }

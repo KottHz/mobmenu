@@ -199,9 +199,26 @@
 }
 
 .empty-state p {
-  margin: 0 0 30px 0;
+  margin: 0 0 16px 0;
   font-size: 16px;
   color: #666;
+}
+
+.empty-state .info-text {
+  margin: 16px 0 30px 0;
+  padding: 16px 20px;
+  background: #e3f2fd;
+  border-left: 4px solid #2196f3;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #1565c0;
+  text-align: left;
+  max-width: 100%;
+}
+
+.empty-state .info-text strong {
+  font-weight: 600;
+  color: #0d47a1;
 }
 
 .sets-grid {
@@ -260,6 +277,11 @@
   color: #721c24;
 }
 
+.badge.default {
+  background: #fff3cd;
+  color: #856404;
+}
+
 .set-info {
   margin-bottom: 16px;
 }
@@ -277,6 +299,38 @@
   border-top: 1px solid #f0f0f0;
 }
 
+.set-card.default-set .set-actions {
+  justify-content: flex-end;
+  width: 100%;
+}
+
+.set-card.default-set .delete-button.icon-only {
+  margin-left: auto;
+}
+
+.set-card.default-set {
+  border: 2px solid #fff3cd;
+  background: linear-gradient(to bottom, #fffef9, #ffffff);
+}
+
+.default-set-info {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #856404;
+  font-style: italic;
+}
+
+.default-set-note {
+  font-size: 13px;
+  color: #856404;
+  font-style: italic;
+  text-align: center;
+  width: 100%;
+  padding: 8px;
+  background: #fff3cd;
+  border-radius: 6px;
+}
+
 .edit-button,
 .delete-button {
   flex: 1;
@@ -287,6 +341,22 @@
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
+}
+
+.delete-button.icon-only {
+  flex: 0 0 auto;
+  padding: 8px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.delete-button.icon-only img {
+  width: 20px;
+  height: 20px;
+  filter: brightness(0) saturate(100%) invert(27%) sepia(95%) saturate(1352%) hue-rotate(340deg) brightness(94%) contrast(86%);
 }
 
 .edit-button {

@@ -1,16 +1,22 @@
 import { useEffect, useLayoutEffect, useState, useRef } from 'react';
-import { useParams, useLocation } from 'react-router-dom';
-import { getAllProducts, type Product } from '../services/productService';
+import { useParams, useLocation, useNavigate as useRouterNavigate } from 'react-router-dom';
+import { getAllProducts, clearProductsCache, type Product } from '../services/productService';
 import { getProductImage } from '../utils/imageHelper';
 import { useCart } from '../contexts/CartContext';
+import { useStore } from '../contexts/StoreContext';
 import { useStoreNavigation } from '../hooks/useStoreNavigation';
 import { formatPrice } from '../utils/priceFormatter';
+import { formatProductTotalPrice, calculateAdditionalPrice } from '../utils/calculateProductPrice';
 import AddToCartPopup from '../components/AddToCartPopup';
+import ProductOptions from '../components/ProductOptions';
+import type { SelectedOptions } from '../types/productOptions';
 import backIcon from '../icons/backicon.svg';
 import './ProductDetails.css';
 
 function ProductDetails() {
   const { navigate } = useStoreNavigation();
+  const { store } = useStore();
+  const routerNavigate = useRouterNavigate();
   const location = useLocation();
   const { productId } = useParams<{ productId: string }>();
   const { addToCart, hasItems, getItemQuantity } = useCart();
@@ -20,6 +26,7 @@ function ProductDetails() {
   const [isLoading, setIsLoading] = useState(true);
   const [isPopupOpen, setIsPopupOpen] = useState(false);
   const [showFixedButton, setShowFixedButton] = useState(false);
+  const [selectedOptions, setSelectedOptions] = useState<SelectedOptions>({});
   const buyButtonRef = useRef<HTMLButtonElement>(null);
 
   // Garantir que a página sempre abre no topo
@@ -33,8 +40,38 @@ function ProductDetails() {
     const fetchProduct = async () => {
       try {
         setIsLoading(true);
-        const products = await getAllProducts();
+        // Limpar cache para garantir que busca as opções atualizadas
+        clearProductsCache();
+        // Passar storeId para garantir que as opções sejam carregadas corretamente
+        const products = await getAllProducts(store?.id);
         const foundProduct = products.find(p => p.id === productId);
+        
+        if (foundProduct) {
+          console.log('📦 [ProductDetails] Produto encontrado:', {
+            id: foundProduct.id,
+            title: foundProduct.title,
+            optionGroupsCount: foundProduct.optionGroups?.length || 0,
+            optionGroups: foundProduct.optionGroups,
+          });
+          
+          // Log detalhado das opções
+          if (foundProduct.optionGroups && foundProduct.optionGroups.length > 0) {
+            console.log('✅ [ProductDetails] Opções encontradas:', {
+              grupos: foundProduct.optionGroups.map(g => ({
+                id: g.id,
+                title: g.title,
+                type: g.type,
+                optionsCount: g.options?.length || 0,
+                options: g.options
+              }))
+            });
+          } else {
+            console.warn('⚠️ [ProductDetails] Produto não tem opções ou opções vazias');
+          }
+        } else {
+          console.warn('⚠️ [ProductDetails] Produto não encontrado:', productId);
+        }
+        
         setProduct(foundProduct || null);
       } catch (error) {
         console.error('Erro ao carregar produto:', error);
@@ -46,7 +83,7 @@ function ProductDetails() {
     if (productId) {
       fetchProduct();
     }
-  }, [productId]);
+  }, [productId, store?.id]);
 
   // Observar visibilidade do botão original
   useEffect(() => {
@@ -76,20 +113,46 @@ function ProductDetails() {
   const handleBackClick = () => {
     // Garantir que a flag de navegação ativa esteja setada antes de voltar
     sessionStorage.setItem('navigationActive', 'true');
-    // Voltar para a página anterior no histórico do navegador
-    navigate(-1);
+    // Voltar para a página anterior no histórico do navegador usando o navigate do react-router-dom
+    routerNavigate(-1);
+  };
+
+  const validateOptions = (): boolean => {
+    if (!product?.optionGroups || product.optionGroups.length === 0) {
+      return true; // Sem opções, sempre válido
+    }
+
+    // Verificar se todas as opções obrigatórias foram preenchidas
+    for (const group of product.optionGroups) {
+      if (!group.required) continue;
+
+      const selections = selectedOptions[group.id] || [];
+      const minSelections = group.minSelections || (group.type === 'single' ? 1 : 0);
+
+      if (selections.length < minSelections) {
+        return false;
+      }
+    }
+
+    return true;
   };
 
   const handleBuyClick = () => {
     if (!product) return;
+
+    // Validar opções antes de adicionar ao carrinho
+    if (!validateOptions()) {
+      alert('Por favor, complete todas as opções obrigatórias antes de continuar.');
+      return;
+    }
     
     // Se veio do checkout, adiciona diretamente ao carrinho e volta
     if (fromCheckout) {
-      addToCart(product.id);
-      navigate(-1);
+      addToCart(product.id, selectedOptions);
+      routerNavigate(-1);
     } else if (hasItems()) {
       // Se há itens no carrinho (modo "adicionar"), adiciona diretamente
-      addToCart(product.id);
+      addToCart(product.id, selectedOptions);
       // Voltar para a Home após adicionar
       sessionStorage.setItem('navigationActive', 'true');
       navigate('');
@@ -101,6 +164,13 @@ function ProductDetails() {
 
   const handleContinue = () => {
     if (!product) return;
+    
+    // Validar opções antes de continuar
+    if (!validateOptions()) {
+      alert('Por favor, complete todas as opções obrigatórias antes de continuar.');
+      return;
+    }
+
     setIsPopupOpen(false);
     // Marcar que está vindo de "CONTINUAR COMPRA" - não ativar modal até chegar no checkout
     sessionStorage.setItem('comingFromContinuePurchase', 'true');
@@ -111,7 +181,14 @@ function ProductDetails() {
 
   const handleAdd = () => {
     if (!product) return;
-    addToCart(product.id);
+    
+    // Validar opções antes de adicionar
+    if (!validateOptions()) {
+      alert('Por favor, complete todas as opções obrigatórias antes de continuar.');
+      return;
+    }
+
+    addToCart(product.id, selectedOptions);
     setIsPopupOpen(false);
     // Voltar para a Home após adicionar (modo adicionar ao carrinho ativo)
     sessionStorage.setItem('navigationActive', 'true');
@@ -208,8 +285,43 @@ function ProductDetails() {
                 <span className="product-details-price-separator">|</span>
               </>
             )}
-            <span className="product-details-price-new">{formatPrice(product.newPrice)}</span>
+            <span className="product-details-price-new">
+              {formatProductTotalPrice(product, selectedOptions)}
+            </span>
+            {(() => {
+              const additional = calculateAdditionalPrice(product, selectedOptions);
+              if (additional > 0) {
+                const additionalReais = additional / 100;
+                return (
+                  <span className="product-details-price-additional">
+                    (+ {formatPrice(additionalReais.toFixed(2).replace('.', ','))} de opções)
+                  </span>
+                );
+              }
+              return null;
+            })()}
           </div>
+
+          {(() => {
+            const hasOptions = product.optionGroups && product.optionGroups.length > 0;
+            console.log('🔍 [ProductDetails] Verificando renderização de opções:', {
+              hasOptionGroups: !!product.optionGroups,
+              optionGroupsLength: product.optionGroups?.length || 0,
+              willRender: hasOptions,
+              optionGroups: product.optionGroups
+            });
+            
+            if (hasOptions) {
+              return (
+                <ProductOptions
+                  optionGroups={product.optionGroups!}
+                  onSelectionChange={setSelectedOptions}
+                />
+              );
+            }
+            
+            return null;
+          })()}
 
           <button 
             ref={buyButtonRef}

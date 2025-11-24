@@ -1,5 +1,5 @@
 .checkout-content {
-  padding: 30px 16px 180px;
+  padding: 30px 16px 40px;
   background-color: #FFFFFF;
   max-width: 100%;
   min-height: calc(100vh - 200px);
@@ -286,6 +286,18 @@
   font-size: 16px;
   color: #d2e7d6;
   font-weight: 700;
+}
+
+.checkout-item-options {
+  margin: 4px 0;
+}
+
+.checkout-options-text {
+  font-size: 12px;
+  color: #d2e7d6;
+  font-weight: 400;
+  line-height: 1.4;
+  display: block;
 }
 
 .checkout-item-quantity {
@@ -629,19 +641,20 @@
 
 .checkout-coupon-btn {
   width: 100%;
-  background-color: #16A34A;
-  color: #FFFFFF;
-  border: none;
+  background-color: #E5E7EB;
+  color: #1a1a1a;
+  border: 1px solid #D1D5DB;
   padding: 12px;
   font-size: 14px;
   font-weight: 600;
   border-radius: 6px;
   cursor: pointer;
-  transition: background-color 0.3s ease;
+  transition: all 0.3s ease;
 }
 
 .checkout-coupon-btn:hover {
-  background-color: #15803d;
+  background-color: #D1D5DB;
+  border-color: #9CA3AF;
 }
 
 .checkout-coupon-btn:active {
@@ -708,16 +721,9 @@
   transition: opacity 0.2s;
 }
 
-.checkout-finish-button-container {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  width: 100%;
-  background-color: #4A2C1A;
-  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
-  z-index: 1000;
-  padding: 16px;
-  margin: 0;
+.checkout-buttons-container {
+  margin-top: 32px;
+  padding: 0;
   box-sizing: border-box;
 }
 
@@ -729,9 +735,10 @@
 }
 
 .checkout-btn-secondary {
-  background-color: rgba(255, 255, 255, 0.1);
-  color: #FFFFFF;
-  border: 2px solid rgba(255, 255, 255, 0.3);
+  background: #FCD7A6;
+  background: linear-gradient(145deg, rgba(252, 215, 166, 1) 25%, rgba(252, 215, 166, 0.9) 100%);
+  color: #4A2C1A;
+  border: none;
   padding: 14px;
   font-size: 16px;
   font-weight: 600;
@@ -747,8 +754,8 @@
 }
 
 .checkout-btn-secondary:hover {
-  background-color: rgba(255, 255, 255, 0.2);
-  border-color: rgba(255, 255, 255, 0.5);
+  background: linear-gradient(145deg, rgba(252, 215, 166, 0.9) 25%, rgba(252, 215, 166, 0.8) 100%);
+  opacity: 0.95;
 }
 
 .checkout-finish-button {
@@ -774,9 +781,9 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  background: #FCD7A6;
-  background: linear-gradient(145deg, rgba(252, 215, 166, 1) 25%, rgba(252, 215, 166, 0) 100%);
-  color: #4A2C1A;
+  background: #16A34A;
+  background: linear-gradient(145deg, rgba(22, 163, 74, 1) 25%, rgba(22, 163, 74, 0.9) 100%);
+  color: #FFFFFF;
   padding: 14px;
   border-radius: 6px;
   font-size: 16px;
@@ -804,15 +811,16 @@
 }
 
 .checkout-finish-button:hover {
-  background-color: rgba(255, 255, 255, 0.05);
+  background-color: transparent;
 }
 
 .checkout-finish-button:hover .checkout-finish-content {
-  opacity: 0.9;
+  background: linear-gradient(145deg, rgba(21, 128, 61, 1) 25%, rgba(21, 128, 61, 0.9) 100%);
+  opacity: 1;
 }
 
 .checkout-finish-button:active {
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: transparent;
 }
 
 .checkout-finish-button:active .checkout-finish-content {
@@ -875,22 +883,15 @@
     font-size: 18px;
   }
 
-  .checkout-finish-button-container {
-    position: relative;
-    width: 100vw;
-    margin: 32px 0 0;
-    margin-left: calc(50% - 50vw);
-    left: auto;
-    right: auto;
-    transform: none;
-    box-shadow: none;
-    padding: 16px;
-    box-sizing: border-box;
+  .checkout-buttons-container {
+    max-width: 768px;
+    margin: 32px auto 0;
+    width: 100%;
   }
   
-  .checkout-finish-button-container .checkout-buttons-wrapper {
-    max-width: 768px;
-    margin: 0 auto;
+  .checkout-buttons-container .checkout-buttons-wrapper {
+    max-width: 100%;
+    margin: 0;
     width: 100%;
   }
 

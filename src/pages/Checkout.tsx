@@ -3,8 +3,10 @@ import { useParams } from 'react-router-dom';
 import { useCart } from '../contexts/CartContext';
 import { useStoreNavigation } from '../hooks/useStoreNavigation';
 import { getAllProducts, type Product } from '../services/productService';
-import { productImages } from '../data/products';
+import { getProductImage } from '../utils/imageHelper';
 import { formatPrice } from '../utils/priceFormatter';
+import { formatSelectedOptions } from '../utils/formatSelectedOptions';
+import { calculateProductTotalPrice, formatProductTotalPrice } from '../utils/calculateProductPrice';
 import trashIcon from '../icons/trash-svgrepo-com.svg';
 import addIcon from '../icons/add-ellipse-svgrepo-com.svg';
 import './Checkout.css';
@@ -146,23 +148,23 @@ function Checkout() {
       .filter((product): product is Product => product !== undefined);
   }, [products, alsoOrderProductIds]);
 
-  // Calcular total do carrinho
+  // Calcular total do carrinho incluindo preços adicionais das opções
   const cartTotal = useMemo(() => {
     if (cartItems.length === 0) {
       return '0,00';
     }
-    let total = 0;
+    let totalInCents = 0;
     cartItems.forEach((item) => {
       const product = products.find((p) => p.id === item.productId);
       if (product) {
-        // Remove R$, espaços e converte vírgula para ponto
-        const priceStr = product.newPrice.replace(/R\$\s*/g, '').replace(/\./g, '').replace(',', '.').trim();
-        const price = parseFloat(priceStr) || 0;
-        total += price * item.quantity;
+        // Calcular preço total incluindo opções selecionadas
+        const itemTotalPrice = calculateProductTotalPrice(product, item.selectedOptions);
+        totalInCents += itemTotalPrice * item.quantity;
       }
     });
-    // Formata o total com 2 casas decimais e vírgula como separador decimal
-    return total.toFixed(2).replace('.', ',');
+    // Converter centavos para reais e formatar
+    const totalInReais = totalInCents / 100;
+    return totalInReais.toFixed(2).replace('.', ',');
   }, [cartItems, products]);
 
   // Inicializar o valor animado quando os produtos carregarem
@@ -402,7 +404,11 @@ function Checkout() {
             <div className="checkout-items">
               {cartProducts.map((product) => {
                 const quantity = getItemQuantity(product.id);
-                const productImage = productImages[product.image] || productImages.product1;
+                const productImage = getProductImage(product.image);
+                
+                // Buscar opções selecionadas para este produto
+                const cartItem = cartItems.find((item) => item.productId === product.id);
+                const selectedOptionsText = formatSelectedOptions(product, cartItem?.selectedOptions);
                 
                 return (
                   <div key={product.id} className="checkout-item">
@@ -415,11 +421,18 @@ function Checkout() {
                       <div className="checkout-title-wrapper">
                         <h3 className="checkout-item-title">{product.title}</h3>
                       </div>
+                      {selectedOptionsText && (
+                        <div className="checkout-item-options">
+                          <span className="checkout-options-text">{selectedOptionsText}</span>
+                        </div>
+                      )}
                       <div className="checkout-item-price">
                         {product.hasDiscount && product.oldPrice && product.oldPrice.trim() !== '' && product.oldPrice !== product.newPrice && (
                           <span className="checkout-price-old">{formatPrice(product.oldPrice)}</span>
                         )}
-                        <span className="checkout-price-new">{formatPrice(product.newPrice)}</span>
+                        <span className="checkout-price-new">
+                          {formatProductTotalPrice(product, cartItem?.selectedOptions)}
+                        </span>
                       </div>
                       <div className="checkout-item-quantity">
                         <span className="quantity-label">Quantidade:</span>
@@ -475,7 +488,7 @@ function Checkout() {
               onMouseMove={handleMouseMove}
             >
               {alsoOrderProducts.map((product) => {
-                const productImage = productImages[product.image] || productImages.product1;
+                const productImage = getProductImage(product.image);
                 return (
                   <div 
                     key={product.id} 
@@ -630,8 +643,8 @@ function Checkout() {
         />
       </div>
 
-      </main>
-      <div className="checkout-finish-button-container">
+      {/* Botões */}
+      <div className="checkout-buttons-container">
         <div className="checkout-buttons-wrapper">
           <button className="checkout-btn-secondary" onClick={handleAddMoreItems}>
             Adicionar mais itens
@@ -643,6 +656,8 @@ function Checkout() {
           </button>
         </div>
       </div>
+
+      </main>
     </>
   );
 }

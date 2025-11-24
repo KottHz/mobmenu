@@ -43,18 +43,6 @@ export default function AdminDashboard() {
                   <p>Cadastre um novo produto</p>
                 </Link>
 
-                <Link to="/admin/secoes" className="action-card">
-                  <span className="action-icon">📝</span>
-                  <h3>Gerenciar Seções</h3>
-                  <p>Organize suas categorias</p>
-                </Link>
-
-                <Link to="/admin/personalizacao" className="action-card">
-                  <span className="action-icon">🎨</span>
-                  <h3>Personalizar Loja</h3>
-                  <p>Cores, logo e banner</p>
-                </Link>
-
                 <Link to="/" className="action-card">
                   <span className="action-icon">👁️</span>
                   <h3>Visualizar Loja</h3>
