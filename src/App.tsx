@@ -7,6 +7,9 @@ import Checkout from './pages/Checkout';
 import Identification from './pages/Identification';
 import ProductDetails from './pages/ProductDetails';
 import { useSearch } from './contexts/SearchContext';
+import { useStore } from './contexts/StoreContext';
+import { useCart } from './contexts/CartContext';
+import MinimumOrderBanner from './components/MinimumOrderBanner';
 
 // Páginas Admin
 import AdminLogin from './pages/admin/Login';
@@ -58,11 +61,35 @@ function App() {
   const headerRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const { isSearchOpen } = useSearch();
+  const { store } = useStore();
+  const { cartItems } = useCart();
   // Detectar rotas com ou sem slug da loja
   const isCheckoutPage = location.pathname.includes('/checkout') && !location.pathname.includes('/checkout/identification') && !location.pathname.includes('/sacola/identification') || location.pathname.includes('/sacola') && !location.pathname.includes('/sacola/identification') || location.pathname === '/cart';
   const isIdentificationPage = location.pathname.includes('/checkout/identification') || location.pathname.includes('/sacola/identification');
   const isProductDetailsPage = location.pathname.includes('/produto/') || location.pathname.includes('/product/');
   const isAdminPage = location.pathname.startsWith('/admin');
+  
+  // Mostrar banner de pedido mínimo apenas em páginas da loja (não checkout, não admin)
+  const showMinimumOrderBanner = !isCheckoutPage && !isAdminPage && cartItems.length > 0;
+
+  // Aplicar cores da loja como variáveis CSS
+  useEffect(() => {
+    const root = document.documentElement;
+    const customizations = store?.customizations;
+    
+    if (customizations) {
+      root.style.setProperty('--store-primary-color', customizations.primaryColor || '#FF6B35');
+      root.style.setProperty('--store-secondary-color', customizations.secondaryColor || '#004E89');
+      root.style.setProperty('--store-background-color', customizations.backgroundColor || '#FFFFFF');
+      root.style.setProperty('--store-text-color', customizations.textColor || '#000000');
+    } else {
+      // Valores padrão
+      root.style.setProperty('--store-primary-color', '#FF6B35');
+      root.style.setProperty('--store-secondary-color', '#004E89');
+      root.style.setProperty('--store-background-color', '#FFFFFF');
+      root.style.setProperty('--store-text-color', '#000000');
+    }
+  }, [store?.customizations]);
 
   // Manter flag de navegação ativa durante navegações internas
   // NOTA: NÃO criar a flag automaticamente baseado em posição salva,
@@ -209,6 +236,9 @@ function App() {
           }
         />
       </Routes>
+      
+      {/* Barrinha de pedido mínimo */}
+      {showMinimumOrderBanner && <MinimumOrderBanner />}
     </div>
   );
 }

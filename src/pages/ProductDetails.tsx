@@ -334,7 +334,7 @@ function ProductDetails() {
       </div>
       
       {/* Botão fixo duplicado */}
-      {showFixedButton && (
+      {showFixedButton && (store?.customizations?.showFixedButton ?? true) && (
         <button 
           className="product-details-buy-btn-fixed" 
           onClick={handleBuyClick}

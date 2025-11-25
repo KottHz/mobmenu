@@ -1,7 +1,7 @@
 .app {
   width: 100%;
   min-height: 100vh;
-  background-color: #FFFFFF;
+  background-color: var(--store-background-color, #FFFFFF);
   overflow-x: hidden;
   box-sizing: border-box;
 }
@@ -13,7 +13,7 @@
   width: 100%;
   max-width: 100%;
   z-index: 1000;
-  background-color: #FFFFFF;
+  background-color: var(--store-background-color, #FFFFFF);
   box-sizing: border-box;
   overflow-x: hidden;
 }
@@ -27,7 +27,7 @@
 
 .main-content {
   padding: 30px 16px 40px;
-  background-color: #FFFFFF;
+  background-color: var(--store-background-color, #FFFFFF);
   max-width: 100%;
   box-sizing: border-box;
   width: 100%;
@@ -58,7 +58,7 @@
   font-family: 'Outfit', sans-serif;
   font-size: 22px;
   font-weight: 700;
-  color: #000000;
+  color: var(--store-text-color, #000000);
   margin-top: 0;
   margin-bottom: 16px;
   text-align: left;

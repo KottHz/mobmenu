@@ -3,10 +3,14 @@ import { supabase } from '../../lib/supabase';
 import { useStore } from '../../contexts/StoreContext';
 import { useAuth } from '../../contexts/AuthContext';
 import AdminLayout from '../../components/admin/AdminLayout';
+import ColorPicker from '../../components/ColorPicker';
 import addImageIcon from '../../icons/addimage.svg';
 import trashIcon from '../../icons/trash-svgrepo-com.svg';
 import { deleteImageFromStorage } from '../../utils/storageHelper';
 import { compressImageIfNeeded, compressBlobIfNeeded } from '../../utils/imageHelper';
+import { getAllProducts, type Product } from '../../services/productService';
+import { getProductImage } from '../../utils/imageHelper';
+import { formatPrice } from '../../utils/priceFormatter';
 import './Personalization.css';
 import '../../components/PromoBanner.css';
 
@@ -36,11 +40,70 @@ export default function AdminPersonalization() {
   const [promoBannerBgColor, setPromoBannerBgColor] = useState('#FDD8A7');
   const [promoBannerTextColor, setPromoBannerTextColor] = useState('#000000');
   const [promoBannerUseGradient, setPromoBannerUseGradient] = useState(true);
+  const [promoBannerAnimation, setPromoBannerAnimation] = useState<string>('gradient');
+  const [promoBannerAnimationSpeed, setPromoBannerAnimationSpeed] = useState<number>(1);
   const [savingPromoBanner, setSavingPromoBanner] = useState(false);
   
   // Estados para edição inline do texto do banner
   const [isEditingPromoText, setIsEditingPromoText] = useState(false);
   const [editingPromoText, setEditingPromoText] = useState('');
+
+  // Estados para cores da loja
+  const [primaryColor, setPrimaryColor] = useState('#FF6B35');
+  const [secondaryColor, setSecondaryColor] = useState('#004E89');
+  const [backgroundColor, setBackgroundColor] = useState('#FFFFFF');
+  const [textColor, setTextColor] = useState('#000000');
+  const [savingColors, setSavingColors] = useState(false);
+
+  // Estado para exibir botão de comprar
+  const [showBuyButton, setShowBuyButton] = useState(true);
+  const [savingBuyButton, setSavingBuyButton] = useState(false);
+  
+  // Refs para controle de salvamento do botão de comprar
+  const isInitialBuyButtonLoadRef = useRef(true);
+  const previousBuyButtonValueRef = useRef<boolean | null>(null);
+
+  // Refs para controle de salvamento do botão flutuante
+  const isInitialFixedButtonLoadRef = useRef(true);
+  const previousFixedButtonValueRef = useRef<boolean | null>(null);
+
+  // Estados para produtos recomendados
+  const [recommendedProductIds, setRecommendedProductIds] = useState<string[]>([]);
+  const [availableProducts, setAvailableProducts] = useState<Product[]>([]);
+  const [productsLoading, setProductsLoading] = useState(false);
+  const [searchProductTerm, setSearchProductTerm] = useState('');
+  const [savingRecommendedProducts, setSavingRecommendedProducts] = useState(false);
+
+  // Estados para pedido mínimo
+  const [minimumOrderValue, setMinimumOrderValue] = useState<number>(0);
+  const [minimumOrderValueDisplay, setMinimumOrderValueDisplay] = useState<string>('0,00');
+  const [savingMinimumOrder, setSavingMinimumOrder] = useState(false);
+
+  // Estado para botão flutuante
+  const [showFixedButton, setShowFixedButton] = useState(true);
+  const [savingFixedButton, setSavingFixedButton] = useState(false);
+  
+  // Refs para controle de salvamento dos produtos recomendados
+  const isInitialRecommendedProductsLoadRef = useRef(true);
+  const previousRecommendedProductsRef = useRef<string[] | null>(null);
+
+  // Refs para controle de salvamento automático
+  const previousValuesRef = useRef<{
+    promoBannerVisible: boolean;
+    promoBannerText: string;
+    promoBannerBgColor: string;
+    promoBannerTextColor: string;
+    promoBannerUseGradient: boolean;
+    promoBannerAnimation: string;
+    promoBannerAnimationSpeed: number;
+  } | null>(null);
+
+  const previousColorsRef = useRef<{
+    primaryColor: string;
+    secondaryColor: string;
+    backgroundColor: string;
+    textColor: string;
+  } | null>(null);
 
   // Aguardar AuthContext terminar de carregar
   useEffect(() => {
@@ -69,14 +132,105 @@ export default function AdminPersonalization() {
       const textToShow = customization?.promoBannerText || 'ESQUENTA BLACK FRIDAY - ATÉ 60%OFF';
       const bgColorToShow = customization?.promoBannerBgColor || '#FDD8A7';
       const textColorToShow = customization?.promoBannerTextColor || '#000000';
+      const visible = customization?.promoBannerVisible ?? true;
+      const useGradient = customization?.promoBannerUseGradient ?? true;
+      const animation = (customization?.promoBannerAnimation && customization.promoBannerAnimation !== 'none') ? customization.promoBannerAnimation : 'gradient';
+      const animationSpeed = customization?.promoBannerAnimationSpeed ?? 1;
       
-      setPromoBannerVisible(customization?.promoBannerVisible ?? true);
+      setPromoBannerVisible(visible);
       setPromoBannerText(textToShow);
       setPromoBannerBgColor(bgColorToShow);
       setPromoBannerTextColor(textColorToShow);
-      setPromoBannerUseGradient(customization?.promoBannerUseGradient ?? true);
+      setPromoBannerUseGradient(useGradient);
+      setPromoBannerAnimation(animation);
+      setPromoBannerAnimationSpeed(animationSpeed);
+
+      // Atualizar valores anteriores quando carregar do banco (para evitar salvamento desnecessário)
+      previousValuesRef.current = {
+        promoBannerVisible: visible,
+        promoBannerText: textToShow,
+        promoBannerBgColor: bgColorToShow,
+        promoBannerTextColor: textColorToShow,
+        promoBannerUseGradient: useGradient,
+        promoBannerAnimation: animation,
+        promoBannerAnimationSpeed: animationSpeed
+      };
+
+      // Carregar valores das cores da loja
+      const primaryColorToShow = customization?.primaryColor || '#FF6B35';
+      const secondaryColorToShow = customization?.secondaryColor || '#004E89';
+      const backgroundColorToShow = customization?.backgroundColor || '#FFFFFF';
+      const storeTextColorToShow = customization?.textColor || '#000000';
+
+      setPrimaryColor(primaryColorToShow);
+      setSecondaryColor(secondaryColorToShow);
+      setBackgroundColor(backgroundColorToShow);
+      setTextColor(storeTextColorToShow);
+
+      // Atualizar valores anteriores das cores
+      previousColorsRef.current = {
+        primaryColor: primaryColorToShow,
+        secondaryColor: secondaryColorToShow,
+        backgroundColor: backgroundColorToShow,
+        textColor: storeTextColorToShow
+      };
+
+      // Carregar valor de exibir botão de comprar
+      const showBuyButtonToShow = customization?.showBuyButton ?? true;
+      setShowBuyButton(showBuyButtonToShow);
+      // Resetar refs quando carregar do banco
+      isInitialBuyButtonLoadRef.current = true;
+      previousBuyButtonValueRef.current = showBuyButtonToShow;
+
+      // Carregar produtos recomendados
+      const recommendedIds = customization?.recommendedProductIds || [];
+      setRecommendedProductIds(recommendedIds);
+      // Resetar refs quando carregar do banco
+      isInitialRecommendedProductsLoadRef.current = true;
+      previousRecommendedProductsRef.current = recommendedIds;
+
+      // Carregar valor mínimo do pedido
+      const minOrderValue = customization?.minimumOrderValue ?? 0;
+      setMinimumOrderValue(minOrderValue);
+      // Converter centavos para reais para exibição
+      const minOrderInReais = minOrderValue / 100;
+      setMinimumOrderValueDisplay(minOrderInReais.toFixed(2).replace('.', ','));
+
+      // Carregar valor de exibir botão flutuante
+      const showFixedButtonToShow = customization?.showFixedButton ?? true;
+      setShowFixedButton(showFixedButtonToShow);
+      // Só resetar refs se for realmente a primeira carga (ref ainda não foi inicializado)
+      if (previousFixedButtonValueRef.current === null) {
+        isInitialFixedButtonLoadRef.current = true;
+        previousFixedButtonValueRef.current = showFixedButtonToShow;
+      }
     }
   }, [store, store?.customizations]);
+
+  // Carregar produtos disponíveis
+  useEffect(() => {
+    const loadProducts = async () => {
+      if (!store?.id) {
+        return;
+      }
+      
+      setProductsLoading(true);
+      try {
+        const products = await getAllProducts(store.id);
+        setAvailableProducts(products);
+        console.log('✅ Produtos carregados para recomendados:', products.length);
+      } catch (error) {
+        console.error('Erro ao carregar produtos:', error);
+        setMessage('❌ Erro ao carregar produtos. Tente recarregar a página.');
+      } finally {
+        setProductsLoading(false);
+      }
+    };
+
+    if (store?.id && !storeLoading && !authLoading) {
+      loadProducts();
+    }
+  }, [store?.id, storeLoading, authLoading]);
 
   // Centralizar imagem quando o editor abrir
   useEffect(() => {
@@ -224,6 +378,757 @@ export default function AdminPersonalization() {
       window.removeEventListener('resize', handleResize);
     };
   }, [isEditing, imageToEdit, imageSize.width, imageSize.height]);
+
+  // Prevenir scroll do body quando o modal estiver aberto
+  useEffect(() => {
+    if (isEditing) {
+      // Salvar o valor atual do overflow
+      const originalOverflow = document.body.style.overflow;
+      // Desabilitar scroll
+      document.body.style.overflow = 'hidden';
+      
+      return () => {
+        // Restaurar o scroll quando o modal fechar
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [isEditing]);
+
+  // Limpar mensagem automaticamente após 3 segundos
+  useEffect(() => {
+    if (message) {
+      const timer = setTimeout(() => {
+        setMessage('');
+      }, 3000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [message]);
+
+  // Ref para rastrear se é o carregamento inicial (não salvar na primeira renderização)
+  const isInitialLoadRef = useRef(true);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isSavingRef = useRef(false);
+
+  // Salvar automaticamente quando os valores do banner mudarem
+  useEffect(() => {
+    // Ignorar na primeira renderização (quando os valores são carregados do banco)
+    if (isInitialLoadRef.current) {
+      isInitialLoadRef.current = false;
+      // Salvar os valores iniciais para comparação futura
+      previousValuesRef.current = {
+        promoBannerVisible,
+        promoBannerText,
+        promoBannerBgColor,
+        promoBannerTextColor,
+        promoBannerUseGradient,
+        promoBannerAnimation,
+        promoBannerAnimationSpeed
+      };
+      return;
+    }
+
+    // Não salvar se não houver store ou se estiver carregando
+    if (!store?.id || storeLoading || authLoading) {
+      return;
+    }
+
+    // Não salvar se já estiver salvando
+    if (isSavingRef.current) {
+      return;
+    }
+
+    // Comparar com valores anteriores para verificar se realmente mudou
+    const previous = previousValuesRef.current;
+    if (previous) {
+      const hasChanged = 
+        previous.promoBannerVisible !== promoBannerVisible ||
+        previous.promoBannerText !== promoBannerText ||
+        previous.promoBannerBgColor !== promoBannerBgColor ||
+        previous.promoBannerTextColor !== promoBannerTextColor ||
+        previous.promoBannerUseGradient !== promoBannerUseGradient ||
+        previous.promoBannerAnimation !== promoBannerAnimation ||
+        previous.promoBannerAnimationSpeed !== promoBannerAnimationSpeed ||
+        previous.promoBannerAnimationSpeed !== promoBannerAnimationSpeed;
+
+      // Se não mudou nada, não salvar
+      if (!hasChanged) {
+        return;
+      }
+    }
+
+    // Limpar timeout anterior se existir
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    // Debounce: aguardar 800ms após a última mudança antes de salvar
+    setSavingPromoBanner(true);
+    saveTimeoutRef.current = setTimeout(async () => {
+      isSavingRef.current = true;
+      try {
+        // Buscar customização existente
+        const { data: existingCustomization } = await supabase
+          .from('store_customizations')
+          .select('id')
+          .eq('store_id', store.id)
+          .maybeSingle();
+
+        const updateData = {
+          promo_banner_visible: promoBannerVisible,
+          promo_banner_text: promoBannerText,
+          promo_banner_bg_color: promoBannerBgColor,
+          promo_banner_text_color: promoBannerTextColor,
+          promo_banner_use_gradient: promoBannerUseGradient,
+          promo_banner_animation: promoBannerAnimation,
+          promo_banner_animation_speed: promoBannerAnimationSpeed,
+          updated_at: new Date().toISOString()
+        };
+
+        if (existingCustomization) {
+          // Atualizar existente - tentar com campos de animação primeiro
+          let { error: updateError } = await supabase
+            .from('store_customizations')
+            .update(updateData)
+            .eq('store_id', store.id);
+
+          // Se der erro porque as colunas não existem, tentar sem elas
+          if (updateError && updateError.message?.includes('promo_banner_animation')) {
+            const updateDataBase = {
+              promo_banner_visible: promoBannerVisible,
+              promo_banner_text: promoBannerText,
+              promo_banner_bg_color: promoBannerBgColor,
+              promo_banner_text_color: promoBannerTextColor,
+              promo_banner_use_gradient: promoBannerUseGradient,
+              updated_at: new Date().toISOString()
+            };
+            const { error: updateErrorBase } = await supabase
+              .from('store_customizations')
+              .update(updateDataBase)
+              .eq('store_id', store.id);
+            if (updateErrorBase) throw updateErrorBase;
+          } else if (updateError) {
+            throw updateError;
+          }
+        } else {
+          // Criar novo
+          const { error: insertError } = await supabase
+            .from('store_customizations')
+            .insert({
+              store_id: store.id,
+              ...updateData
+            });
+
+          if (insertError) throw insertError;
+        }
+
+        // Atualizar valores anteriores para evitar salvamento duplicado
+        previousValuesRef.current = {
+          promoBannerVisible,
+          promoBannerText,
+          promoBannerBgColor,
+          promoBannerTextColor,
+          promoBannerUseGradient,
+          promoBannerAnimation,
+          promoBannerAnimationSpeed
+        };
+
+        // Recarregar customizações (sem atualizar os estados para evitar loop)
+        await reloadCustomizations();
+        setMessage('✅ Personalização do banner atualizada!');
+      } catch (error: any) {
+        console.error('Erro ao salvar personalização do banner:', error);
+        setMessage(`❌ Erro ao salvar: ${error.message || 'Erro desconhecido'}`);
+      } finally {
+        setSavingPromoBanner(false);
+        isSavingRef.current = false;
+      }
+    }, 800);
+
+    // Cleanup
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [promoBannerVisible, promoBannerText, promoBannerBgColor, promoBannerTextColor, promoBannerUseGradient, promoBannerAnimation, promoBannerAnimationSpeed, store?.id, storeLoading, authLoading]);
+
+  // Ref para rastrear se é o carregamento inicial das cores
+  const isInitialColorsLoadRef = useRef(true);
+  const saveColorsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isSavingColorsRef = useRef(false);
+
+  // Salvar automaticamente quando as cores mudarem
+  useEffect(() => {
+    // Ignorar na primeira renderização (quando os valores são carregados do banco)
+    if (isInitialColorsLoadRef.current) {
+      isInitialColorsLoadRef.current = false;
+      // Salvar os valores iniciais para comparação futura
+      previousColorsRef.current = {
+        primaryColor,
+        secondaryColor,
+        backgroundColor,
+        textColor
+      };
+      return;
+    }
+
+    // Não salvar se não houver store ou se estiver carregando
+    if (!store?.id || storeLoading || authLoading) {
+      return;
+    }
+
+    // Não salvar se já estiver salvando
+    if (isSavingColorsRef.current) {
+      return;
+    }
+
+    // Comparar com valores anteriores para verificar se realmente mudou
+    const previous = previousColorsRef.current;
+    if (previous) {
+      const hasChanged = 
+        previous.primaryColor !== primaryColor ||
+        previous.secondaryColor !== secondaryColor ||
+        previous.backgroundColor !== backgroundColor ||
+        previous.textColor !== textColor;
+
+      // Se não mudou nada, não salvar
+      if (!hasChanged) {
+        return;
+      }
+    }
+
+    // Limpar timeout anterior se existir
+    if (saveColorsTimeoutRef.current) {
+      clearTimeout(saveColorsTimeoutRef.current);
+    }
+
+    // Debounce: aguardar 800ms após a última mudança antes de salvar
+    setSavingColors(true);
+    saveColorsTimeoutRef.current = setTimeout(async () => {
+      isSavingColorsRef.current = true;
+      try {
+        // Buscar customização existente
+        const { data: existingCustomization } = await supabase
+          .from('store_customizations')
+          .select('id')
+          .eq('store_id', store.id)
+          .maybeSingle();
+
+        const updateData = {
+          primary_color: primaryColor,
+          secondary_color: secondaryColor,
+          background_color: backgroundColor,
+          text_color: textColor,
+          updated_at: new Date().toISOString()
+        };
+
+        if (existingCustomization) {
+          // Atualizar existente
+          const { error: updateError } = await supabase
+            .from('store_customizations')
+            .update(updateData)
+            .eq('store_id', store.id);
+
+          if (updateError) throw updateError;
+        } else {
+          // Criar novo
+          const { error: insertError } = await supabase
+            .from('store_customizations')
+            .insert({
+              store_id: store.id,
+              ...updateData
+            });
+
+          if (insertError) throw insertError;
+        }
+
+        // Atualizar valores anteriores para evitar salvamento duplicado
+        previousColorsRef.current = {
+          primaryColor,
+          secondaryColor,
+          backgroundColor,
+          textColor
+        };
+
+        // Recarregar customizações (sem atualizar os estados para evitar loop)
+        await reloadCustomizations();
+        setMessage('✅ Cores da loja atualizadas!');
+      } catch (error: any) {
+        console.error('Erro ao salvar cores da loja:', error);
+        setMessage(`❌ Erro ao salvar cores: ${error.message || 'Erro desconhecido'}`);
+      } finally {
+        setSavingColors(false);
+        isSavingColorsRef.current = false;
+      }
+    }, 800);
+
+    // Cleanup
+    return () => {
+      if (saveColorsTimeoutRef.current) {
+        clearTimeout(saveColorsTimeoutRef.current);
+      }
+    };
+  }, [primaryColor, secondaryColor, backgroundColor, textColor, store?.id, storeLoading, authLoading, reloadCustomizations]);
+
+  // Refs para timeout e controle de salvamento do botão de comprar
+  const saveBuyButtonTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isSavingBuyButtonRef = useRef(false);
+
+  // Salvar automaticamente quando showBuyButton mudar
+  useEffect(() => {
+    // Ignorar na primeira renderização
+    if (isInitialBuyButtonLoadRef.current) {
+      isInitialBuyButtonLoadRef.current = false;
+      previousBuyButtonValueRef.current = showBuyButton;
+      return;
+    }
+
+    // Não salvar se não houver store ou se estiver carregando
+    if (!store?.id || storeLoading || authLoading) {
+      return;
+    }
+
+    // Não salvar se o valor não mudou
+    if (previousBuyButtonValueRef.current === showBuyButton) {
+      return;
+    }
+
+    // Não salvar se já estiver salvando
+    if (isSavingBuyButtonRef.current) {
+      return;
+    }
+
+    // Atualizar valor anterior
+    previousBuyButtonValueRef.current = showBuyButton;
+
+    // Limpar timeout anterior se existir
+    if (saveBuyButtonTimeoutRef.current) {
+      clearTimeout(saveBuyButtonTimeoutRef.current);
+    }
+
+    // Debounce: aguardar 500ms após a última mudança antes de salvar
+    setSavingBuyButton(true);
+    saveBuyButtonTimeoutRef.current = setTimeout(async () => {
+      isSavingBuyButtonRef.current = true;
+      try {
+        // Buscar customização existente
+        const { data: existingCustomization } = await supabase
+          .from('store_customizations')
+          .select('id')
+          .eq('store_id', store.id)
+          .maybeSingle();
+
+        const updateData = {
+          show_buy_button: showBuyButton,
+          updated_at: new Date().toISOString()
+        };
+
+        if (existingCustomization) {
+          // Atualizar existente
+          const { error: updateError } = await supabase
+            .from('store_customizations')
+            .update(updateData)
+            .eq('store_id', store.id);
+
+          if (updateError) throw updateError;
+        } else {
+          // Criar novo
+          const { error: insertError } = await supabase
+            .from('store_customizations')
+            .insert({
+              store_id: store.id,
+              ...updateData
+            });
+
+          if (insertError) throw insertError;
+        }
+
+        // Recarregar customizações
+        await reloadCustomizations();
+        setMessage('✅ Configuração do botão de comprar atualizada!');
+      } catch (error: any) {
+        console.error('Erro ao salvar configuração do botão de comprar:', error);
+        setMessage(`❌ Erro ao salvar: ${error.message || 'Erro desconhecido'}`);
+      } finally {
+        setSavingBuyButton(false);
+        isSavingBuyButtonRef.current = false;
+      }
+    }, 500);
+
+    // Cleanup
+    return () => {
+      if (saveBuyButtonTimeoutRef.current) {
+        clearTimeout(saveBuyButtonTimeoutRef.current);
+      }
+    };
+  }, [showBuyButton, store?.id, storeLoading, authLoading]);
+
+  // Refs para timeout e controle de salvamento do botão flutuante
+  const saveFixedButtonTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isSavingFixedButtonRef = useRef(false);
+
+  // Salvar automaticamente quando showFixedButton mudar
+  useEffect(() => {
+    // Ignorar na primeira renderização
+    if (isInitialFixedButtonLoadRef.current) {
+      isInitialFixedButtonLoadRef.current = false;
+      previousFixedButtonValueRef.current = showFixedButton;
+      console.log('🔵 [FixedButton] Primeira carga, ignorando:', showFixedButton);
+      return;
+    }
+
+    // Não salvar se não houver store ou se estiver carregando
+    if (!store?.id || storeLoading || authLoading) {
+      console.log('🔵 [FixedButton] Store não disponível ou carregando');
+      return;
+    }
+
+    // Não salvar se o valor não mudou
+    if (previousFixedButtonValueRef.current === showFixedButton) {
+      console.log('🔵 [FixedButton] Valor não mudou:', showFixedButton);
+      return;
+    }
+
+    // Não salvar se já estiver salvando
+    if (isSavingFixedButtonRef.current) {
+      console.log('🔵 [FixedButton] Já está salvando');
+      return;
+    }
+
+    // Capturar o valor atual antes de atualizar a referência
+    const valueToSave = showFixedButton;
+    
+    console.log('✅ [FixedButton] Iniciando salvamento:', {
+      anterior: previousFixedButtonValueRef.current,
+      novo: valueToSave
+    });
+    
+    // Atualizar valor anterior
+    previousFixedButtonValueRef.current = valueToSave;
+
+    // Limpar timeout anterior se existir
+    if (saveFixedButtonTimeoutRef.current) {
+      clearTimeout(saveFixedButtonTimeoutRef.current);
+    }
+
+    // Debounce: aguardar 500ms após a última mudança antes de salvar
+    setSavingFixedButton(true);
+    saveFixedButtonTimeoutRef.current = setTimeout(async () => {
+      isSavingFixedButtonRef.current = true;
+      try {
+        // Buscar customização existente
+        const { data: existingCustomization } = await supabase
+          .from('store_customizations')
+          .select('id')
+          .eq('store_id', store.id)
+          .maybeSingle();
+
+        const updateData = {
+          show_fixed_button: valueToSave,
+          updated_at: new Date().toISOString()
+        };
+        
+        console.log('💾 Salvando showFixedButton:', valueToSave);
+
+        if (existingCustomization) {
+          // Atualizar existente
+          const { error: updateError } = await supabase
+            .from('store_customizations')
+            .update(updateData)
+            .eq('store_id', store.id);
+
+          if (updateError) throw updateError;
+        } else {
+          // Criar novo
+          const { error: insertError } = await supabase
+            .from('store_customizations')
+            .insert({
+              store_id: store.id,
+              ...updateData
+            });
+
+          if (insertError) throw insertError;
+        }
+
+        // Recarregar customizações
+        await reloadCustomizations();
+        setMessage('✅ Configuração do botão flutuante atualizada!');
+      } catch (error: any) {
+        console.error('Erro ao salvar configuração do botão flutuante:', error);
+        setMessage(`❌ Erro ao salvar: ${error.message || 'Erro desconhecido'}`);
+      } finally {
+        setSavingFixedButton(false);
+        isSavingFixedButtonRef.current = false;
+      }
+    }, 500);
+
+    // Cleanup
+    return () => {
+      if (saveFixedButtonTimeoutRef.current) {
+        clearTimeout(saveFixedButtonTimeoutRef.current);
+      }
+    };
+  }, [showFixedButton, store?.id, storeLoading, authLoading]);
+
+  // Refs para timeout e controle de salvamento dos produtos recomendados
+  const saveRecommendedProductsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isSavingRecommendedProductsRef = useRef(false);
+
+  // Função para comparar arrays de IDs
+  const arraysEqual = (a: string[], b: string[]): boolean => {
+    if (a.length !== b.length) return false;
+    return a.every((val, index) => val === b[index]);
+  };
+
+  // Salvar automaticamente quando recommendedProductIds mudar
+  useEffect(() => {
+    // Ignorar na primeira renderização
+    if (isInitialRecommendedProductsLoadRef.current) {
+      isInitialRecommendedProductsLoadRef.current = false;
+      previousRecommendedProductsRef.current = [...recommendedProductIds];
+      return;
+    }
+
+    // Não salvar se não houver store ou se estiver carregando
+    if (!store?.id || storeLoading || authLoading) {
+      return;
+    }
+
+    // Não salvar se o valor não mudou
+    if (previousRecommendedProductsRef.current !== null && 
+        arraysEqual(previousRecommendedProductsRef.current, recommendedProductIds)) {
+      return;
+    }
+
+    // Não salvar se já estiver salvando
+    if (isSavingRecommendedProductsRef.current) {
+      return;
+    }
+
+    // Atualizar valor anterior
+    previousRecommendedProductsRef.current = [...recommendedProductIds];
+
+    // Limpar timeout anterior se existir
+    if (saveRecommendedProductsTimeoutRef.current) {
+      clearTimeout(saveRecommendedProductsTimeoutRef.current);
+    }
+
+    // Debounce: aguardar 800ms após a última mudança antes de salvar
+    setSavingRecommendedProducts(true);
+    saveRecommendedProductsTimeoutRef.current = setTimeout(async () => {
+      isSavingRecommendedProductsRef.current = true;
+      try {
+        // Buscar customização existente
+        const { data: existingCustomization } = await supabase
+          .from('store_customizations')
+          .select('id')
+          .eq('store_id', store.id)
+          .maybeSingle();
+
+        const updateData = {
+          recommended_product_ids: recommendedProductIds,
+          updated_at: new Date().toISOString()
+        };
+
+        if (existingCustomization) {
+          // Atualizar existente
+          const { error: updateError } = await supabase
+            .from('store_customizations')
+            .update(updateData)
+            .eq('store_id', store.id);
+
+          if (updateError) throw updateError;
+        } else {
+          // Criar novo
+          const { error: insertError } = await supabase
+            .from('store_customizations')
+            .insert({
+              store_id: store.id,
+              ...updateData
+            });
+
+          if (insertError) throw insertError;
+        }
+
+        // Recarregar customizações
+        await reloadCustomizations();
+        setMessage('✅ Produtos recomendados atualizados!');
+      } catch (error: any) {
+        console.error('Erro ao salvar produtos recomendados:', error);
+        setMessage(`❌ Erro ao salvar: ${error.message || 'Erro desconhecido'}`);
+      } finally {
+        setSavingRecommendedProducts(false);
+        isSavingRecommendedProductsRef.current = false;
+      }
+    }, 800);
+
+    // Cleanup
+    return () => {
+      if (saveRecommendedProductsTimeoutRef.current) {
+        clearTimeout(saveRecommendedProductsTimeoutRef.current);
+      }
+    };
+  }, [recommendedProductIds, store?.id, storeLoading, authLoading]);
+
+  // Funções para gerenciar produtos recomendados
+  const handleToggleProduct = (productId: string) => {
+    setRecommendedProductIds(prev => {
+      if (prev.includes(productId)) {
+        return prev.filter(id => id !== productId);
+      } else {
+        // Limitar a 15 produtos
+        if (prev.length >= 15) {
+          setMessage('⚠️ Máximo de 15 produtos recomendados permitido');
+          return prev;
+        }
+        return [...prev, productId];
+      }
+    });
+  };
+
+  const handleMoveProduct = (index: number, direction: 'up' | 'down') => {
+    setRecommendedProductIds(prev => {
+      const newIds = [...prev];
+      if (direction === 'up' && index > 0) {
+        [newIds[index - 1], newIds[index]] = [newIds[index], newIds[index - 1]];
+      } else if (direction === 'down' && index < newIds.length - 1) {
+        [newIds[index], newIds[index + 1]] = [newIds[index + 1], newIds[index]];
+      }
+      return newIds;
+    });
+  };
+
+  const handleRemoveProduct = (productId: string) => {
+    setRecommendedProductIds(prev => prev.filter(id => id !== productId));
+  };
+
+  const handleClearAll = () => {
+    if (confirm('Tem certeza que deseja remover todos os produtos recomendados?')) {
+      setRecommendedProductIds([]);
+    }
+  };
+
+  // Refs para controle de salvamento do pedido mínimo
+  const isInitialMinimumOrderLoadRef = useRef(true);
+  const previousMinimumOrderValueRef = useRef<number | null>(null);
+  const saveMinimumOrderTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isSavingMinimumOrderRef = useRef(false);
+
+  // Converter valor de exibição (reais) para centavos
+  const handleMinimumOrderValueChange = (value: string) => {
+    // Remover caracteres não numéricos exceto vírgula e ponto
+    const cleaned = value.replace(/[^\d,.]/g, '');
+    setMinimumOrderValueDisplay(cleaned);
+    
+    // Converter para centavos
+    const valueInReais = parseFloat(cleaned.replace(',', '.')) || 0;
+    const valueInCents = Math.round(valueInReais * 100);
+    setMinimumOrderValue(valueInCents);
+  };
+
+  // Salvar automaticamente quando minimumOrderValue mudar
+  useEffect(() => {
+    // Ignorar na primeira renderização
+    if (isInitialMinimumOrderLoadRef.current) {
+      isInitialMinimumOrderLoadRef.current = false;
+      previousMinimumOrderValueRef.current = minimumOrderValue;
+      return;
+    }
+
+    // Não salvar se não houver store ou se estiver carregando
+    if (!store?.id || storeLoading || authLoading) {
+      return;
+    }
+
+    // Não salvar se o valor não mudou
+    if (previousMinimumOrderValueRef.current === minimumOrderValue) {
+      return;
+    }
+
+    // Não salvar se já estiver salvando
+    if (isSavingMinimumOrderRef.current) {
+      return;
+    }
+
+    // Atualizar valor anterior
+    previousMinimumOrderValueRef.current = minimumOrderValue;
+
+    // Limpar timeout anterior se existir
+    if (saveMinimumOrderTimeoutRef.current) {
+      clearTimeout(saveMinimumOrderTimeoutRef.current);
+    }
+
+    // Debounce: aguardar 800ms após a última mudança antes de salvar
+    setSavingMinimumOrder(true);
+    saveMinimumOrderTimeoutRef.current = setTimeout(async () => {
+      isSavingMinimumOrderRef.current = true;
+      try {
+        // Buscar customização existente
+        const { data: existingCustomization } = await supabase
+          .from('store_customizations')
+          .select('id')
+          .eq('store_id', store.id)
+          .maybeSingle();
+
+        const updateData = {
+          minimum_order_value: minimumOrderValue,
+          updated_at: new Date().toISOString()
+        };
+
+        if (existingCustomization) {
+          // Atualizar existente
+          const { error: updateError } = await supabase
+            .from('store_customizations')
+            .update(updateData)
+            .eq('store_id', store.id);
+
+          if (updateError) throw updateError;
+        } else {
+          // Criar novo
+          const { error: insertError } = await supabase
+            .from('store_customizations')
+            .insert({
+              store_id: store.id,
+              ...updateData
+            });
+
+          if (insertError) throw insertError;
+        }
+
+        // Recarregar customizações
+        await reloadCustomizations();
+        setMessage('✅ Valor mínimo do pedido atualizado!');
+      } catch (error: any) {
+        console.error('Erro ao salvar valor mínimo do pedido:', error);
+        setMessage(`❌ Erro ao salvar: ${error.message || 'Erro desconhecido'}`);
+      } finally {
+        setSavingMinimumOrder(false);
+        isSavingMinimumOrderRef.current = false;
+      }
+    }, 800);
+
+    // Cleanup
+    return () => {
+      if (saveMinimumOrderTimeoutRef.current) {
+        clearTimeout(saveMinimumOrderTimeoutRef.current);
+      }
+    };
+  }, [minimumOrderValue, store?.id, storeLoading, authLoading]);
+
+  // Filtrar produtos baseado na busca
+  const filteredProducts = availableProducts.filter(product => {
+    if (!searchProductTerm) return true;
+    const searchLower = searchProductTerm.toLowerCase();
+    return product.title.toLowerCase().includes(searchLower) ||
+           product.description1?.toLowerCase().includes(searchLower) ||
+           product.description2?.toLowerCase().includes(searchLower);
+  });
+
+  // Obter produtos selecionados na ordem correta
+  const selectedProducts = recommendedProductIds
+    .map(id => availableProducts.find(p => p.id === id))
+    .filter((p): p is Product => p !== undefined);
 
   const handleImageClick = () => {
     fileInputRef.current?.click();
@@ -829,7 +1734,7 @@ export default function AdminPersonalization() {
       }
 
       setLogoPreview(publicUrl);
-      setMessage('✅ Logo atualizado com sucesso!');
+      setMessage('✅ Banner atualizado!');
       
       // Recarregar customizações
       await reloadCustomizations();
@@ -909,61 +1814,6 @@ export default function AdminPersonalization() {
     }
   };
 
-  const handleSavePromoBanner = async () => {
-    if (!store?.id) return;
-
-    setSavingPromoBanner(true);
-    setMessage('⏳ Salvando personalização do banner...');
-
-    try {
-      // Buscar customização existente
-      const { data: existingCustomization } = await supabase
-        .from('store_customizations')
-        .select('id')
-        .eq('store_id', store.id)
-        .maybeSingle();
-
-      const updateData = {
-        promo_banner_visible: promoBannerVisible,
-        promo_banner_text: promoBannerText,
-        promo_banner_bg_color: promoBannerBgColor,
-        promo_banner_text_color: promoBannerTextColor,
-        promo_banner_use_gradient: promoBannerUseGradient,
-        updated_at: new Date().toISOString()
-      };
-
-      if (existingCustomization) {
-        // Atualizar existente
-        const { error: updateError } = await supabase
-          .from('store_customizations')
-          .update(updateData)
-          .eq('store_id', store.id);
-
-        if (updateError) throw updateError;
-      } else {
-        // Criar novo
-        const { error: insertError } = await supabase
-          .from('store_customizations')
-          .insert({
-            store_id: store.id,
-            ...updateData
-          });
-
-        if (insertError) throw insertError;
-      }
-
-      setMessage('✅ Personalização do banner salva com sucesso!');
-      
-      // Recarregar customizações
-      await reloadCustomizations();
-    } catch (error: any) {
-      console.error('Erro ao salvar personalização do banner:', error);
-      setMessage(`❌ Erro ao salvar: ${error.message || 'Erro desconhecido'}`);
-    } finally {
-      setSavingPromoBanner(false);
-    }
-  };
-
   // Funções para edição inline do texto do banner
   const handlePromoTextDoubleClick = () => {
     setIsEditingPromoText(true);
@@ -1025,6 +1875,7 @@ export default function AdminPersonalization() {
             promo_banner_bg_color: promoBannerBgColor,
             promo_banner_text_color: promoBannerTextColor,
             promo_banner_use_gradient: promoBannerUseGradient,
+            promo_banner_animation: promoBannerAnimation,
             ...updateData
           });
 
@@ -1146,7 +1997,7 @@ export default function AdminPersonalization() {
         <p className="subtitle">Personalize a aparência da sua loja</p>
 
         {message && (
-          <div className={`message ${message.includes('❌') ? 'error' : 'success'}`}>
+          <div className={`message floating ${message.includes('❌') ? 'error' : 'success'}`}>
             {message}
           </div>
         )}
@@ -1265,63 +2116,38 @@ export default function AdminPersonalization() {
             Personalize a barra promocional que aparece no topo do cardápio.
           </p>
 
-          <div className="form-group">
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-              <input
-                type="checkbox"
-                checked={promoBannerVisible}
-                onChange={(e) => setPromoBannerVisible(e.target.checked)}
-                style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-              />
-              <span>Exibir barra promocional</span>
-            </label>
-          </div>
-
           {promoBannerVisible && (
             <>
               {/* Banner Editável - substitui o campo de input */}
               <div className="form-group">
-                <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
-                  Texto do Banner (clique duas vezes para editar)
-                </label>
-                {/* Quadrado clicável para selecionar a cor de fundo */}
-                <div style={{ marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <span style={{ fontSize: '14px', fontWeight: '500', color: '#333' }}>
-                    Cor da Barra Promocional:
-                  </span>
-                  <label
-                    htmlFor="promoBannerBgColorPicker"
-                    style={{
-                      width: '30px',
-                      height: '30px',
-                      backgroundColor: promoBannerBgColor,
-                      border: '1px solid #ddd',
-                      borderRadius: '4px',
-                      boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-                      cursor: 'pointer',
-                      display: 'block',
-                      position: 'relative',
-                      flexShrink: 0
-                    }}
-                    title={`Clique para alterar a cor de fundo (${promoBannerBgColor})`}
-                  >
-                    <input
-                      id="promoBannerBgColorPicker"
-                      type="color"
-                      value={promoBannerBgColor}
-                      onChange={(e) => setPromoBannerBgColor(e.target.value)}
-                      style={{
-                        position: 'absolute',
-                        width: '100%',
-                        height: '100%',
-                        opacity: 0,
-                        cursor: 'pointer',
-                        border: 'none',
-                        padding: 0,
-                        margin: 0
-                      }}
-                    />
-                  </label>
+                {/* Campos de cor lado a lado */}
+                <div style={{ marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', flexWrap: 'wrap', width: '100%' }}>
+                  {/* Seletor de cor para o fundo */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '2px', justifyContent: 'center' }}>
+                    <span style={{ fontSize: '14px', fontWeight: '500', color: '#333', margin: 0, padding: 0, display: 'inline-block', verticalAlign: 'middle' }}>
+                      Cor da Barra Promocional:
+                    </span>
+                    <span style={{ display: 'inline-block', verticalAlign: 'middle', margin: 0, padding: 0 }}>
+                      <ColorPicker
+                        value={promoBannerBgColor}
+                        onChange={setPromoBannerBgColor}
+                        label="Cor de fundo"
+                      />
+                    </span>
+                  </div>
+                  {/* Seletor de cor para o texto */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '2px', justifyContent: 'center' }}>
+                    <span style={{ fontSize: '14px', fontWeight: '500', color: '#333', margin: 0, padding: 0, display: 'inline-block', verticalAlign: 'middle' }}>
+                      Cor do Texto:
+                    </span>
+                    <span style={{ display: 'inline-block', verticalAlign: 'middle', margin: 0, padding: 0 }}>
+                      <ColorPicker
+                        value={promoBannerTextColor}
+                        onChange={setPromoBannerTextColor}
+                        label="Cor do texto"
+                      />
+                    </span>
+                  </div>
                 </div>
                 <div
                   style={{
@@ -1373,7 +2199,7 @@ export default function AdminPersonalization() {
                       />
                     ) : (
                       <p
-                        className={`promo-text ${promoBannerUseGradient ? 'with-gradient' : ''}`}
+                        className={`promo-text ${promoBannerUseGradient ? `animation-${promoBannerAnimation}` : ''}`}
                         onDoubleClick={handlePromoTextDoubleClick}
                         style={{
                           fontSize: '16px',
@@ -1382,8 +2208,11 @@ export default function AdminPersonalization() {
                           letterSpacing: '1px',
                           margin: 0,
                           cursor: 'pointer',
-                          ...(!promoBannerUseGradient ? { color: promoBannerTextColor } : {})
-                        }}
+                          ...(!promoBannerUseGradient ? { color: promoBannerTextColor } : {}),
+                          ...(promoBannerUseGradient ? {
+                            '--animation-speed': promoBannerAnimationSpeed
+                          } : {})
+                        } as React.CSSProperties}
                         title="Clique duas vezes para editar"
                       >
                         {promoBannerText || 'ESQUENTA BLACK FRIDAY - ATÉ 60%OFF'}
@@ -1391,85 +2220,547 @@ export default function AdminPersonalization() {
                     )}
                   </section>
                 </div>
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="promoBannerTextColor" style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
-                  Cor do Texto
-                </label>
-                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                
+                {/* Toggle de efeito de texto */}
+                <div className="toggle-container">
+                  <span style={{ display: 'inline-block', verticalAlign: 'middle', margin: 0, padding: 0, flexShrink: 0 }}>Efeito de texto:</span>
                   <input
-                    id="promoBannerTextColor"
-                    type="color"
-                    value={promoBannerTextColor}
-                    onChange={(e) => setPromoBannerTextColor(e.target.value)}
-                    disabled={promoBannerUseGradient}
-                    style={{
-                      width: '60px',
-                      height: '40px',
-                      border: '1px solid #ddd',
-                      borderRadius: '6px',
-                      cursor: promoBannerUseGradient ? 'not-allowed' : 'pointer',
-                      opacity: promoBannerUseGradient ? 0.5 : 1
-                    }}
+                    type="checkbox"
+                    id="promoBannerUseGradientToggle"
+                    checked={promoBannerUseGradient}
+                    onChange={(e) => setPromoBannerUseGradient(e.target.checked)}
                   />
-                  <input
-                    type="text"
-                    value={promoBannerTextColor}
-                    onChange={(e) => setPromoBannerTextColor(e.target.value)}
-                    placeholder="#000000"
-                    disabled={promoBannerUseGradient}
+                  <label htmlFor="promoBannerUseGradientToggle">Toggle</label>
+                  <select
+                    value={promoBannerAnimation}
+                    onChange={(e) => setPromoBannerAnimation(e.target.value)}
+                    disabled={!promoBannerUseGradient}
                     style={{
-                      flex: 1,
-                      padding: '12px',
+                      padding: '4px 8px',
+                      fontSize: '14px',
                       border: '1px solid #ddd',
-                      borderRadius: '6px',
-                      fontSize: '16px',
-                      fontFamily: 'monospace',
-                      opacity: promoBannerUseGradient ? 0.5 : 1,
-                      cursor: promoBannerUseGradient ? 'not-allowed' : 'text'
+                      borderRadius: '4px',
+                      backgroundColor: promoBannerUseGradient ? '#fff' : '#f5f5f5',
+                      color: '#333',
+                      cursor: promoBannerUseGradient ? 'pointer' : 'not-allowed',
+                      opacity: promoBannerUseGradient ? 1 : 0.6
                     }}
-                  />
+                  >
+                    <option value="gradient" style={{ color: '#333' }}>Gradiente</option>
+                    <option value="blink" style={{ color: '#333' }}>Piscar</option>
+                    <option value="slide" style={{ color: '#333' }}>Deslizar</option>
+                    <option value="pulse" style={{ color: '#333' }}>Pulsar</option>
+                    <option value="rotate" style={{ color: '#333' }}>Rotação de Cores</option>
+                  </select>
+                  <span
+                    onClick={() => {
+                      if (!promoBannerUseGradient) return;
+                      setPromoBannerAnimationSpeed(prev => {
+                        if (prev === 1) return 1.5;
+                        if (prev === 1.5) return 2;
+                        if (prev === 2) return 2.5;
+                        if (prev === 2.5) return 3;
+                        return 1;
+                      });
+                    }}
+                    style={{
+                      marginLeft: '8px',
+                      padding: '4px 12px',
+                      fontSize: '14px',
+                      border: '1px solid #ddd',
+                      borderRadius: '4px',
+                      backgroundColor: promoBannerUseGradient ? '#fff' : '#f5f5f5',
+                      color: '#333',
+                      cursor: promoBannerUseGradient ? 'pointer' : 'not-allowed',
+                      opacity: promoBannerUseGradient ? 1 : 0.6,
+                      userSelect: 'none',
+                      display: 'inline-block',
+                      minWidth: '40px',
+                      textAlign: 'center'
+                    }}
+                  >
+                    {promoBannerAnimationSpeed}x
+                  </span>
                 </div>
               </div>
 
-              <div className="form-group">
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-                  <input
-                    type="checkbox"
-                    checked={promoBannerUseGradient}
-                    onChange={(e) => setPromoBannerUseGradient(e.target.checked)}
-                    style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-                  />
-                  <span>Usar gradiente animado no texto</span>
+
+            </>
+          )}
+        </div>
+
+        {/* Seção de Cores da Loja */}
+        <div className="form-container" style={{ marginTop: '30px', display: 'block' }}>
+          <h2>Cores da Loja</h2>
+          <p className="form-description">
+            Personalize as cores principais da sua loja. Essas cores serão aplicadas em botões, links e outros elementos do site.
+          </p>
+
+          <div className="form-group">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '24px', marginTop: '20px' }}>
+              {/* Cor Primária */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <label style={{ fontSize: '14px', fontWeight: '600', color: '#333', margin: 0 }}>
+                  Cor Primária
                 </label>
-                <p style={{ fontSize: '12px', color: '#666', marginTop: '4px', marginLeft: '26px' }}>
-                  Quando ativado, o texto terá um efeito de gradiente animado. A cor do texto será ignorada.
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <ColorPicker
+                    value={primaryColor}
+                    onChange={setPrimaryColor}
+                    label="Cor primária"
+                  />
+                  <span style={{ fontSize: '13px', color: '#666', fontFamily: 'monospace' }}>
+                    {primaryColor}
+                  </span>
+                </div>
+                <p style={{ fontSize: '12px', color: '#999', margin: 0 }}>
+                  Usada em botões principais e elementos de destaque
                 </p>
               </div>
 
-              <div className="form-group" style={{ marginTop: '24px' }}>
-                <button
-                  type="button"
-                  onClick={handleSavePromoBanner}
-                  disabled={savingPromoBanner}
-                  style={{
-                    padding: '12px 24px',
-                    backgroundColor: '#007bff',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '6px',
-                    fontSize: '16px',
-                    fontWeight: '500',
-                    cursor: savingPromoBanner ? 'not-allowed' : 'pointer',
-                    opacity: savingPromoBanner ? 0.6 : 1
-                  }}
-                >
-                  {savingPromoBanner ? 'Salvando...' : 'Salvar Personalização do Banner'}
-                </button>
+              {/* Cor Secundária */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <label style={{ fontSize: '14px', fontWeight: '600', color: '#333', margin: 0 }}>
+                  Cor Secundária
+                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <ColorPicker
+                    value={secondaryColor}
+                    onChange={setSecondaryColor}
+                    label="Cor secundária"
+                  />
+                  <span style={{ fontSize: '13px', color: '#666', fontFamily: 'monospace' }}>
+                    {secondaryColor}
+                  </span>
+                </div>
+                <p style={{ fontSize: '12px', color: '#999', margin: 0 }}>
+                  Usada em elementos secundários e complementares
+                </p>
               </div>
-            </>
-          )}
+
+              {/* Cor de Fundo */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <label style={{ fontSize: '14px', fontWeight: '600', color: '#333', margin: 0 }}>
+                  Cor de Fundo
+                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <ColorPicker
+                    value={backgroundColor}
+                    onChange={setBackgroundColor}
+                    label="Cor de fundo"
+                  />
+                  <span style={{ fontSize: '13px', color: '#666', fontFamily: 'monospace' }}>
+                    {backgroundColor}
+                  </span>
+                </div>
+                <p style={{ fontSize: '12px', color: '#999', margin: 0 }}>
+                  Cor de fundo principal da loja
+                </p>
+              </div>
+
+              {/* Cor do Texto */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <label style={{ fontSize: '14px', fontWeight: '600', color: '#333', margin: 0 }}>
+                  Cor do Texto
+                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <ColorPicker
+                    value={textColor}
+                    onChange={setTextColor}
+                    label="Cor do texto"
+                  />
+                  <span style={{ fontSize: '13px', color: '#666', fontFamily: 'monospace' }}>
+                    {textColor}
+                  </span>
+                </div>
+                <p style={{ fontSize: '12px', color: '#999', margin: 0 }}>
+                  Cor principal do texto da loja
+                </p>
+              </div>
+            </div>
+
+            {savingColors && (
+              <div style={{ marginTop: '16px', fontSize: '13px', color: '#666', fontStyle: 'italic' }}>
+                Salvando cores...
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Seção de Configurações de Exibição */}
+        <div className="form-container" style={{ marginTop: '30px', display: 'block' }}>
+          <h2>Configurações de Exibição</h2>
+          <p className="form-description">
+            Configure quais elementos devem ser exibidos na loja.
+          </p>
+
+          <div className="form-group" style={{ alignItems: 'flex-start', textAlign: 'left' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%' }}>
+              {/* Toggle para exibir botão de comprar */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
+                  <label style={{ fontSize: '16px', fontWeight: '600', color: '#333', margin: 0 }}>
+                    Exibir botão de comprar nos cards
+                  </label>
+                  <p style={{ fontSize: '13px', color: '#666', margin: 0 }}>
+                    Quando ativado, os botões "COMPRAR" e "ADICIONAR" aparecem nos cards dos produtos
+                  </p>
+                </div>
+                <div className="toggle-container" style={{ margin: 0, flexShrink: 0 }}>
+                  <input
+                    type="checkbox"
+                    id="showBuyButtonToggle"
+                    checked={showBuyButton}
+                    onChange={(e) => setShowBuyButton(e.target.checked)}
+                  />
+                  <label htmlFor="showBuyButtonToggle">Toggle</label>
+                </div>
+              </div>
+
+              {savingBuyButton && (
+                <div style={{ fontSize: '13px', color: '#666', fontStyle: 'italic', paddingLeft: '16px' }}>
+                  Salvando configuração...
+                </div>
+              )}
+
+              {/* Toggle para exibir botão flutuante */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
+                  <label style={{ fontSize: '16px', fontWeight: '600', color: '#333', margin: 0 }}>
+                    Exibir botão flutuante na página do produto
+                  </label>
+                  <p style={{ fontSize: '13px', color: '#666', margin: 0 }}>
+                    Quando ativado, um botão flutuante aparece na parte inferior da tela ao rolar a página de detalhes do produto
+                  </p>
+                </div>
+                <div className="toggle-container" style={{ margin: 0, flexShrink: 0 }}>
+                  <input
+                    type="checkbox"
+                    id="showFixedButtonToggle"
+                    checked={showFixedButton}
+                    onChange={(e) => setShowFixedButton(e.target.checked)}
+                  />
+                  <label htmlFor="showFixedButtonToggle">Toggle</label>
+                </div>
+              </div>
+
+              {savingFixedButton && (
+                <div style={{ fontSize: '13px', color: '#666', fontStyle: 'italic', paddingLeft: '16px' }}>
+                  Salvando configuração...
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Seção de Pedido Mínimo */}
+        <div className="form-container" style={{ marginTop: '30px', display: 'block' }}>
+          <h2>Pedido Mínimo</h2>
+          <p className="form-description">
+            Configure o valor mínimo que o cliente precisa atingir para finalizar o pedido. Deixe em R$ 0,00 para não ter pedido mínimo.
+          </p>
+
+          <div className="form-group" style={{ alignItems: 'flex-start', textAlign: 'left' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%', maxWidth: '400px' }}>
+              <label style={{ fontSize: '16px', fontWeight: '600', color: '#333', margin: 0 }}>
+                Valor Mínimo do Pedido
+              </label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '18px', fontWeight: '600', color: '#333' }}>R$</span>
+                <input
+                  type="text"
+                  value={minimumOrderValueDisplay}
+                  onChange={(e) => handleMinimumOrderValueChange(e.target.value)}
+                  placeholder="0,00"
+                  style={{
+                    flex: 1,
+                    padding: '12px 16px',
+                    fontSize: '16px',
+                    border: '1px solid #ddd',
+                    borderRadius: '8px',
+                    boxSizing: 'border-box',
+                    fontFamily: 'monospace'
+                  }}
+                />
+              </div>
+              <p style={{ fontSize: '13px', color: '#666', margin: 0 }}>
+                {minimumOrderValue === 0 
+                  ? 'Sem pedido mínimo configurado' 
+                  : `Pedido mínimo: ${formatPrice((minimumOrderValue / 100).toFixed(2).replace('.', ','))}`}
+              </p>
+
+              {savingMinimumOrder && (
+                <div style={{ fontSize: '13px', color: '#666', fontStyle: 'italic' }}>
+                  Salvando configuração...
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Seção de Produtos Recomendados */}
+        <div className="form-container" style={{ marginTop: '30px', display: 'block' }}>
+          <h2>Produtos Recomendados</h2>
+          <p className="form-description">
+            Configure quais produtos aparecem na seção "Peça também" na página de checkout. Os produtos aparecerão na ordem que você selecionar.
+          </p>
+
+          <div className="form-group" style={{ alignItems: 'flex-start', textAlign: 'left' }}>
+            {/* Produtos Selecionados */}
+            {selectedProducts.length > 0 && (
+              <div style={{ width: '100%', marginBottom: '24px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#333', margin: 0 }}>
+                    Produtos Selecionados ({selectedProducts.length}/15)
+                  </h3>
+                  <button
+                    onClick={handleClearAll}
+                    style={{
+                      padding: '6px 12px',
+                      fontSize: '13px',
+                      color: '#dc3545',
+                      background: 'transparent',
+                      border: '1px solid #dc3545',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontWeight: '500'
+                    }}
+                  >
+                    Limpar Todos
+                  </button>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {selectedProducts.map((product, index) => {
+                    const productImage = getProductImage(product.image);
+                    return (
+                      <div
+                        key={product.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '12px',
+                          padding: '12px',
+                          backgroundColor: '#f9f9f9',
+                          borderRadius: '8px',
+                          border: '1px solid #e0e0e0'
+                        }}
+                      >
+                        <img
+                          src={productImage}
+                          alt={product.title}
+                          style={{
+                            width: '60px',
+                            height: '60px',
+                            objectFit: 'cover',
+                            borderRadius: '6px',
+                            flexShrink: 0
+                          }}
+                        />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <h4 style={{ fontSize: '14px', fontWeight: '600', color: '#333', margin: '0 0 4px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {product.title}
+                          </h4>
+                          <p style={{ fontSize: '13px', color: '#666', margin: 0 }}>
+                            {formatPrice(product.newPrice)}
+                          </p>
+                        </div>
+                        <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
+                          <button
+                            onClick={() => handleMoveProduct(index, 'up')}
+                            disabled={index === 0}
+                            style={{
+                              padding: '6px',
+                              fontSize: '16px',
+                              background: index === 0 ? '#f0f0f0' : '#007bff',
+                              color: index === 0 ? '#999' : '#fff',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: index === 0 ? 'not-allowed' : 'pointer',
+                              opacity: index === 0 ? 0.5 : 1
+                            }}
+                            title="Mover para cima"
+                          >
+                            ↑
+                          </button>
+                          <button
+                            onClick={() => handleMoveProduct(index, 'down')}
+                            disabled={index === selectedProducts.length - 1}
+                            style={{
+                              padding: '6px',
+                              fontSize: '16px',
+                              background: index === selectedProducts.length - 1 ? '#f0f0f0' : '#007bff',
+                              color: index === selectedProducts.length - 1 ? '#999' : '#fff',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: index === selectedProducts.length - 1 ? 'not-allowed' : 'pointer',
+                              opacity: index === selectedProducts.length - 1 ? 0.5 : 1
+                            }}
+                            title="Mover para baixo"
+                          >
+                            ↓
+                          </button>
+                          <button
+                            onClick={() => handleRemoveProduct(product.id)}
+                            style={{
+                              padding: '6px',
+                              background: '#dc3545',
+                              color: '#fff',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}
+                            title="Remover"
+                          >
+                            <img src={trashIcon} alt="Remover" style={{ width: '16px', height: '16px', filter: 'brightness(0) invert(1)' }} />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Busca de Produtos */}
+            <div style={{ width: '100%', marginBottom: '16px' }}>
+              <input
+                type="text"
+                placeholder="Buscar produtos..."
+                value={searchProductTerm}
+                onChange={(e) => setSearchProductTerm(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '12px 16px',
+                  fontSize: '14px',
+                  border: '1px solid #ddd',
+                  borderRadius: '8px',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
+
+            {/* Lista de Produtos Disponíveis */}
+            {productsLoading ? (
+              <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
+                Carregando produtos...
+              </div>
+            ) : (
+              <div style={{ width: '100%' }}>
+                <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#333', margin: '0 0 12px 0' }}>
+                  Produtos Disponíveis ({filteredProducts.length})
+                </h3>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                  gap: '12px',
+                  maxHeight: '500px',
+                  overflowY: 'auto',
+                  padding: '8px',
+                  border: '1px solid #e0e0e0',
+                  borderRadius: '8px',
+                  backgroundColor: '#fafafa'
+                }}>
+                  {filteredProducts.map((product) => {
+                    const productImage = getProductImage(product.image);
+                    const isSelected = recommendedProductIds.includes(product.id);
+                    const isDisabled = !isSelected && recommendedProductIds.length >= 15;
+                    
+                    return (
+                      <div
+                        key={product.id}
+                        onClick={() => !isDisabled && handleToggleProduct(product.id)}
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          padding: '12px',
+                          backgroundColor: isSelected ? '#e3f2fd' : '#fff',
+                          border: `2px solid ${isSelected ? '#2196f3' : '#e0e0e0'}`,
+                          borderRadius: '8px',
+                          cursor: isDisabled ? 'not-allowed' : 'pointer',
+                          opacity: isDisabled ? 0.5 : 1,
+                          transition: 'all 0.2s ease',
+                          position: 'relative'
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!isDisabled) {
+                            e.currentTarget.style.transform = 'translateY(-2px)';
+                            e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.boxShadow = 'none';
+                        }}
+                      >
+                        <div style={{ position: 'absolute', top: '8px', right: '8px' }}>
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => {}}
+                            onClick={(e) => e.stopPropagation()}
+                            disabled={isDisabled}
+                            style={{
+                              width: '20px',
+                              height: '20px',
+                              cursor: isDisabled ? 'not-allowed' : 'pointer'
+                            }}
+                          />
+                        </div>
+                        <img
+                          src={productImage}
+                          alt={product.title}
+                          style={{
+                            width: '100%',
+                            height: '120px',
+                            objectFit: 'cover',
+                            borderRadius: '6px',
+                            marginBottom: '8px'
+                          }}
+                        />
+                        <h4 style={{
+                          fontSize: '13px',
+                          fontWeight: '600',
+                          color: '#333',
+                          margin: '0 0 4px 0',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          lineHeight: '1.4',
+                          minHeight: '36px'
+                        }}>
+                          {product.title}
+                        </h4>
+                        <p style={{
+                          fontSize: '14px',
+                          fontWeight: '700',
+                          color: '#2196f3',
+                          margin: 0
+                        }}>
+                          {formatPrice(product.newPrice)}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+                {filteredProducts.length === 0 && (
+                  <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
+                    Nenhum produto encontrado
+                  </div>
+                )}
+              </div>
+            )}
+
+            {savingRecommendedProducts && (
+              <div style={{ fontSize: '13px', color: '#666', fontStyle: 'italic', marginTop: '16px', paddingLeft: '16px' }}>
+                Salvando produtos recomendados...
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </AdminLayout>

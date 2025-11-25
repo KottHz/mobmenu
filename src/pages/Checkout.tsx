@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useState, useMemo, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { useCart } from '../contexts/CartContext';
+import { useStore } from '../contexts/StoreContext';
 import { useStoreNavigation } from '../hooks/useStoreNavigation';
 import { getAllProducts, type Product } from '../services/productService';
 import { getProductImage } from '../utils/imageHelper';
@@ -13,6 +14,7 @@ import './Checkout.css';
 
 function Checkout() {
   const { navigate } = useStoreNavigation();
+  const { store } = useStore();
   const { productId } = useParams<{ productId?: string }>();
   const { cartItems, addToCart, removeFromCart, getItemQuantity } = useCart();
   const [products, setProducts] = useState<Product[]>([]);
@@ -27,15 +29,8 @@ function Checkout() {
   const [isModalFirstAppearance, setIsModalFirstAppearance] = useState(false);
   const previousCartLengthRef = useRef<number>(0);
   const [isModalElasticBounce, setIsModalElasticBounce] = useState(false);
-  // IDs dos produtos que devem aparecer no "Peça também"
-  // Ordem: Produto 1, Produto 6, Produto 4, Produto 2, Produto 5 (todos da seção 2 - COMPLEMENTOS)
-  const [alsoOrderProductIds] = useState<string[]>([
-    '7028cc82-ad0c-49b2-954a-62efa28de896', // Produto 1: Alfajor Tradicional
-    'd72803b0-bf5a-417a-9bff-29e00bc28b4b', // Produto 6: Doce de Leite com Café
-    'de89616b-5ca8-4582-8985-c91c80d68f57', // Produto 4: Kit 4 Queijos de Alagoa-MG
-    '8b41fd0e-bf2b-4e2f-a0d9-0d0115b1310f', // Produto 2: 4 Queijos de Alagoa + Geleia de Pimenta
-    '61b7a3a7-beee-4137-b2dc-0ed46e4c0dbe', // Produto 5: Bala de Doce de Leite 300g
-  ]);
+  // IDs dos produtos que devem aparecer no "Peça também" - agora vem das customizações
+  const alsoOrderProductIds = store?.customizations?.recommendedProductIds || [];
   const alsoOrderGridRef = useRef<HTMLDivElement>(null);
   const isDraggingRef = useRef(false);
   const startXRef = useRef(0);
@@ -129,24 +124,27 @@ function Checkout() {
   }, [cartProducts.length]);
 
   // Filtrar produtos para "Peça também" - mantém todos os produtos visíveis mesmo após adicionar ao carrinho
-  // Mantém a ordem especificada no array alsoOrderProductIds
+  // Mantém a ordem especificada no array alsoOrderProductIds, excluindo produtos já no carrinho
   const alsoOrderProducts = useMemo(() => {
     if (alsoOrderProductIds.length === 0) return [];
+    
+    // Obter IDs dos produtos que já estão no carrinho
+    const cartProductIds = new Set(cartItems.map(item => item.productId));
     
     // Criar um mapa para manter a ordem
     const productMap = new Map<string, Product>();
     products.forEach((product) => {
-      // Inclui todos os produtos da lista, independente de estarem no carrinho
-      if (alsoOrderProductIds.includes(product.id)) {
+      // Inclui apenas produtos da lista que NÃO estão no carrinho
+      if (alsoOrderProductIds.includes(product.id) && !cartProductIds.has(product.id)) {
         productMap.set(product.id, product);
       }
     });
     
-    // Retornar na ordem especificada
+    // Retornar na ordem especificada, excluindo produtos do carrinho
     return alsoOrderProductIds
       .map((id) => productMap.get(id))
       .filter((product): product is Product => product !== undefined);
-  }, [products, alsoOrderProductIds]);
+  }, [products, alsoOrderProductIds, cartItems]);
 
   // Calcular total do carrinho incluindo preços adicionais das opções
   const cartTotal = useMemo(() => {
@@ -291,7 +289,31 @@ function Checkout() {
     navigate('');
   };
 
+  // Verificar se o pedido atinge o valor mínimo
+  const minimumOrderValue = store?.customizations?.minimumOrderValue ?? 0;
+  const cartTotalInCents = useMemo(() => {
+    if (cartItems.length === 0) return 0;
+    let totalInCents = 0;
+    cartItems.forEach((item) => {
+      const product = products.find((p) => p.id === item.productId);
+      if (product) {
+        const itemTotalPrice = calculateProductTotalPrice(product, item.selectedOptions);
+        totalInCents += itemTotalPrice * item.quantity;
+      }
+    });
+    return totalInCents;
+  }, [cartItems, products]);
+
+  const meetsMinimumOrder = minimumOrderValue === 0 || cartTotalInCents >= minimumOrderValue;
+  const remainingAmount = minimumOrderValue > 0 && cartTotalInCents < minimumOrderValue
+    ? minimumOrderValue - cartTotalInCents
+    : 0;
+  const remainingAmountInReais = remainingAmount / 100;
+
   const handleNext = () => {
+    if (!meetsMinimumOrder) {
+      return;
+    }
     navigate('/sacola/identification');
   };
 
@@ -643,13 +665,38 @@ function Checkout() {
         />
       </div>
 
+      {/* Aviso de pedido mínimo */}
+      {minimumOrderValue > 0 && !meetsMinimumOrder && (
+        <div className="checkout-minimum-order-warning">
+          <div className="checkout-minimum-order-warning-content">
+            <span className="checkout-minimum-order-warning-text">
+              Faltam <strong>{formatPrice(remainingAmountInReais.toFixed(2).replace('.', ','))}</strong> para atingir o pedido mínimo
+            </span>
+            <div className="checkout-minimum-order-warning-progress">
+              <div 
+                className="checkout-minimum-order-warning-progress-bar"
+                style={{ width: `${Math.min((cartTotalInCents / minimumOrderValue) * 100, 100)}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Botões */}
       <div className="checkout-buttons-container">
         <div className="checkout-buttons-wrapper">
           <button className="checkout-btn-secondary" onClick={handleAddMoreItems}>
             Adicionar mais itens
           </button>
-          <button className="checkout-finish-button" onClick={handleNext}>
+          <button 
+            className="checkout-finish-button" 
+            onClick={handleNext}
+            disabled={!meetsMinimumOrder}
+            style={{
+              opacity: meetsMinimumOrder ? 1 : 0.5,
+              cursor: meetsMinimumOrder ? 'pointer' : 'not-allowed'
+            }}
+          >
             <div className="checkout-finish-content">
               <span>Próximo</span>
             </div>
