@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { getProductImage } from '../utils/imageHelper';
 import AddToCartPopup from './AddToCartPopup';
 import { useCart } from '../contexts/CartContext';
+import { useStore } from '../contexts/StoreContext';
 import { useIntersectionObserver } from '../hooks/useIntersectionObserver';
 import { useStoreNavigation } from '../hooks/useStoreNavigation';
 import { formatPrice } from '../utils/priceFormatter';
@@ -37,6 +38,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
   previewMode = false,
 }) => {
   const { navigate } = useStoreNavigation();
+  const { store } = useStore();
   const { addToCart, removeFromCart, getItemQuantity, hasItems } = useCart();
   const productImage = getProductImage(image);
   const [imageRef, isImageVisibleFromObserver] = useIntersectionObserver<HTMLDivElement>({
@@ -347,16 +349,18 @@ const ProductCard: React.FC<ProductCardProps> = ({
             <span className="price-new">{formattedNewPrice}</span>
           </div>
         </div>
-        <div className="buy-btn-container" onClick={(e) => e.stopPropagation()}>
-          {cartHasItems && (
-            <button className="trash-btn" onClick={handleTrashClick} aria-label="Remover do carrinho">
-              <img src={trashIcon} alt="Remover" className="trash-icon" />
+        {store?.customizations?.showBuyButton !== false && (
+          <div className="buy-btn-container" onClick={(e) => e.stopPropagation()}>
+            {cartHasItems && (
+              <button className="trash-btn" onClick={handleTrashClick} aria-label="Remover do carrinho">
+                <img src={trashIcon} alt="Remover" className="trash-icon" />
+              </button>
+            )}
+            <button className={`buy-btn ${cartHasItems ? 'add-mode' : ''}`} onClick={handleBuyClick}>
+              {cartHasItems ? 'ADICIONAR' : 'COMPRAR'}
             </button>
-          )}
-          <button className={`buy-btn ${cartHasItems ? 'add-mode' : ''}`} onClick={handleBuyClick}>
-            {cartHasItems ? 'ADICIONAR' : 'COMPRAR'}
-          </button>
-        </div>
+          </div>
+        )}
       </div>
       <AddToCartPopup
         isOpen={isPopupOpen}

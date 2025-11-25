@@ -11,6 +11,8 @@ interface StoreCustomizations {
   promoBannerBgColor: string;
   promoBannerTextColor: string;
   promoBannerUseGradient: boolean;
+  promoBannerAnimation?: string;
+  promoBannerAnimationSpeed?: number;
   primaryColor: string;
   secondaryColor: string;
   backgroundColor: string;
@@ -18,6 +20,10 @@ interface StoreCustomizations {
   showSearch: boolean;
   showMenu: boolean;
   showCart: boolean;
+  showBuyButton: boolean;
+  recommendedProductIds: string[];
+  minimumOrderValue: number; // Valor mínimo do pedido em centavos
+  showFixedButton: boolean; // Mostrar botão flutuante na página de produto
 }
 
 interface Store {
@@ -311,6 +317,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         promoBannerBgColor: data.promo_banner_bg_color || '#FDD8A7',
         promoBannerTextColor: data.promo_banner_text_color || '#000000',
         promoBannerUseGradient: data.promo_banner_use_gradient ?? true,
+        promoBannerAnimation: data.promo_banner_animation || 'gradient',
+        promoBannerAnimationSpeed: data.promo_banner_animation_speed ?? 1,
         primaryColor: data.primary_color || '#FF6B35',
         secondaryColor: data.secondary_color || '#004E89',
         backgroundColor: data.background_color || '#FFFFFF',
@@ -318,6 +326,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         showSearch: data.show_search ?? true,
         showMenu: data.show_menu ?? true,
         showCart: data.show_cart ?? true,
+        showBuyButton: data.show_buy_button ?? true,
+        recommendedProductIds: Array.isArray(data.recommended_product_ids) 
+          ? data.recommended_product_ids 
+          : (data.recommended_product_ids ? [data.recommended_product_ids] : []),
+        minimumOrderValue: data.minimum_order_value ?? 0,
+        showFixedButton: data.show_fixed_button !== null && data.show_fixed_button !== undefined 
+          ? data.show_fixed_button 
+          : true,
       };
 
       setStore(prev => prev ? { ...prev, customizations } : null);

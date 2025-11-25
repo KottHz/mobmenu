@@ -28,8 +28,9 @@
   user-select: none;
 }
 
-/* Gradiente animado (quando .with-gradient está ativo) */
-.promo-text.with-gradient {
+/* Animações do texto promocional */
+.promo-text.animation-gradient {
+  --base-duration: 8s;
   background: linear-gradient(
     90deg,
     #000000 0%,
@@ -42,7 +43,44 @@
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
-  animation: color-shift 8s ease-in-out infinite;
+  animation: color-shift calc(var(--base-duration) / var(--animation-speed, 1)) ease-in-out infinite;
+}
+
+.promo-text.animation-blink {
+  --base-duration: 1.5s;
+  color: inherit;
+  animation: blink calc(var(--base-duration) / var(--animation-speed, 1)) ease-in-out infinite;
+}
+
+.promo-text.animation-slide {
+  --base-duration: 3s;
+  color: inherit;
+  animation: slide calc(var(--base-duration) / var(--animation-speed, 1)) ease-in-out infinite;
+}
+
+.promo-text.animation-pulse {
+  --base-duration: 2s;
+  color: inherit;
+  animation: pulse calc(var(--base-duration) / var(--animation-speed, 1)) ease-in-out infinite;
+}
+
+.promo-text.animation-rotate {
+  --base-duration: 5s;
+  background: linear-gradient(
+    90deg,
+    #ff0000 0%,
+    #ff7f00 16.66%,
+    #ffff00 33.33%,
+    #00ff00 50%,
+    #0000ff 66.66%,
+    #4b0082 83.33%,
+    #9400d3 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: rotate-colors calc(var(--base-duration) / var(--animation-speed, 1)) linear infinite;
 }
 
 @keyframes color-shift {
@@ -54,6 +92,48 @@
   }
   100% {
     background-position: 0% 50%;
+  }
+}
+
+@keyframes blink {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+@keyframes slide {
+  0% {
+    transform: translateX(-10px);
+    opacity: 0.8;
+  }
+  50% {
+    transform: translateX(10px);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(-10px);
+    opacity: 0.8;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+@keyframes rotate-colors {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 200% 50%;
   }
 }
 

@@ -1,6 +1,7 @@
 import React from 'react';
 import basketIcon from '../icons/basket-svgrepo-com.svg';
 import { useSearch } from '../contexts/SearchContext';
+import { useCart } from '../contexts/CartContext';
 import { useStoreNavigation } from '../hooks/useStoreNavigation';
 import './CartBottomModal.css';
 
@@ -11,6 +12,10 @@ interface CartBottomModalProps {
 const CartBottomModal: React.FC<CartBottomModalProps> = ({ isExiting = false }) => {
   const { navigate } = useStoreNavigation();
   const { isSearchOpen, setIsSearchOpen, setSearchTerm } = useSearch();
+  const { cartItems } = useCart();
+
+  // Calcular total de itens no carrinho
+  const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
   const handleCartClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
@@ -30,10 +35,12 @@ const CartBottomModal: React.FC<CartBottomModalProps> = ({ isExiting = false }) 
 
   return (
     <div className={`cart-bottom-modal ${isExiting ? 'exiting' : ''}`}>
-      <button className="cart-bottom-button" onClick={handleCartClick}>
+      <button className="cart-bottom-button" onClick={handleCartClick} aria-label="Ver carrinho">
         <div className="cart-bottom-content">
-          <span>Ver carrinho</span>
           <img src={basketIcon} alt="Carrinho" className="cart-bottom-icon" />
+          {totalItems > 0 && (
+            <span className="cart-bottom-badge">{totalItems}</span>
+          )}
         </div>
       </button>
     </div>

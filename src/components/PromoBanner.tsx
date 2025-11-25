@@ -30,6 +30,8 @@ const PromoBanner = () => {
   const bgColor = customization?.promoBannerBgColor || '#FDD8A7';
   const textColor = customization?.promoBannerTextColor || '#000000';
   const useGradient = customization?.promoBannerUseGradient ?? true;
+  const animation = (customization?.promoBannerAnimation && customization.promoBannerAnimation !== 'none') ? customization.promoBannerAnimation : 'gradient';
+  const animationSpeed = customization?.promoBannerAnimationSpeed ?? 1;
   
   // Funções para edição inline
   const handlePromoTextDoubleClick = (e: React.MouseEvent<HTMLParagraphElement>) => {
@@ -158,7 +160,7 @@ const PromoBanner = () => {
         />
       ) : (
         <p 
-          className={`promo-text ${useGradient ? 'with-gradient' : ''}`}
+          className={`promo-text ${useGradient ? `animation-${animation}` : ''}`}
           onDoubleClick={handlePromoTextDoubleClick}
           onClick={(e) => {
             // Prevenir que cliques simples interfiram
@@ -168,8 +170,11 @@ const PromoBanner = () => {
           }}
           style={{
             ...(!useGradient ? { color: textColor } : {}),
-            ...(isAdminMode ? { cursor: 'pointer', userSelect: 'none' } : {})
-          }}
+            ...(isAdminMode ? { cursor: 'pointer', userSelect: 'none' } : {}),
+            ...(useGradient ? {
+              '--animation-speed': animationSpeed
+            } : {})
+          } as React.CSSProperties}
           title={isAdminMode ? 'Clique duas vezes para editar' : undefined}
         >
           {text}
