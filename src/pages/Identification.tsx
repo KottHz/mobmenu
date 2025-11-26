@@ -6,6 +6,7 @@ import { getAllProducts, type Product } from '../services/productService';
 import { getProductImage } from '../utils/imageHelper';
 import { formatPrice } from '../utils/priceFormatter';
 import logoImage from '../assets/fequeijaologo.png';
+import { useStore } from '../contexts/StoreContext';
 import basketIcon from '../icons/basket-svgrepo-com.svg';
 import backIcon from '../icons/backicon.svg';
 import woodenTableImage from '../assets/empty-wooden-table-top-isolated-white-background-used-display-montage-your-products.png';
@@ -15,6 +16,7 @@ function Identification() {
   const { navigate } = useStoreNavigation();
   const { cartItems, getItemQuantity } = useCart();
   const { isSearchOpen, setIsSearchOpen, setSearchTerm } = useSearch();
+  const { store } = useStore();
   const [products, setProducts] = useState<Product[]>([]);
   const [isCartDropdownOpen, setIsCartDropdownOpen] = useState(false);
   const cartDropdownRef = useRef<HTMLDivElement>(null);
@@ -76,6 +78,17 @@ function Identification() {
     };
     fetchProducts();
   }, []);
+
+  // Preencher cidade e estado com os dados da loja
+  useEffect(() => {
+    if (store?.city && store?.state) {
+      setFormData(prev => ({
+        ...prev,
+        city: store.city || prev.city,
+        state: store.state || prev.state
+      }));
+    }
+  }, [store?.city, store?.state]);
 
   // Calcular total do carrinho
   const cartTotal = useMemo(() => {
@@ -402,6 +415,9 @@ function Identification() {
 
   // Validar se todos os campos estão preenchidos
   const isFormValid = useMemo(() => {
+    const checkoutTheme = store?.customizations?.checkoutTheme || 'ecommerce';
+    const isLocalTheme = checkoutTheme === 'local';
+    
     // Validar se os campos estão completamente preenchidos
     const phoneNumbers = formData.phone.replace(/\D/g, '');
     const cpfNumbers = formData.cpf.replace(/\D/g, '');
@@ -414,30 +430,52 @@ function Identification() {
                       !formData.email.endsWith('@') &&
                       !formData.email.endsWith('.');
     
-    const basicFieldsValid = (
-      formData.fullName.trim() !== '' &&
-      emailValid &&
-      phoneNumbers.length >= 10 && // Telefone deve ter pelo menos 10 dígitos
-      cpfNumbers.length === 11 && // CPF deve ter exatamente 11 dígitos
-      cepNumbers.length === 8 && // CEP deve ter exatamente 8 dígitos
-      cepData !== null && // CEP deve ter sido encontrado
-      !cepError // CEP não deve ter erro
-    );
-    
-    // Se CEP foi encontrado, validar campos de endereço e frete
-    if (cepData && !cepError) {
+    // Validação baseada no tema
+    if (isLocalTheme) {
+      // Tema Local: validação simplificada sem CEP
+      const basicFieldsValid = (
+        formData.fullName.trim() !== '' &&
+        emailValid &&
+        phoneNumbers.length >= 10 && // Telefone deve ter pelo menos 10 dígitos
+        cpfNumbers.length === 11 // CPF deve ter exatamente 11 dígitos
+      );
+      
       const addressValid = (
+        formData.street.trim() !== '' &&
         (formData.number.trim() !== '' || formData.hasNoNumber) &&
         formData.neighborhood.trim() !== '' &&
         formData.city.trim() !== '' &&
-        formData.state.trim() !== '' &&
-        selectedShipping !== null
+        formData.state.trim().length === 2 // Estado deve ter 2 caracteres
       );
+      
       return basicFieldsValid && addressValid;
+    } else {
+      // Tema Ecommerce: validação completa com CEP
+      const basicFieldsValid = (
+        formData.fullName.trim() !== '' &&
+        emailValid &&
+        phoneNumbers.length >= 10 && // Telefone deve ter pelo menos 10 dígitos
+        cpfNumbers.length === 11 && // CPF deve ter exatamente 11 dígitos
+        cepNumbers.length === 8 && // CEP deve ter exatamente 8 dígitos
+        cepData !== null && // CEP deve ter sido encontrado
+        !cepError // CEP não deve ter erro
+      );
+      
+      // Se CEP foi encontrado, validar campos de endereço e frete
+      if (cepData && !cepError) {
+        const addressValid = (
+          (formData.number.trim() !== '' || formData.hasNoNumber) &&
+          formData.neighborhood.trim() !== '' &&
+          formData.city.trim() !== '' &&
+          formData.state.trim() !== '' &&
+          selectedShipping !== null
+        );
+        return basicFieldsValid && addressValid;
+      }
+      
+      return false; // Não é válido se CEP não foi encontrado
     }
-    
-    return false; // Não é válido se CEP não foi encontrado
-  }, [formData, cepData, cepError, selectedShipping]);
+  }, [formData, cepData, cepError, selectedShipping, store?.customizations?.checkoutTheme]);
 
   // Limpar erro de validação quando o formulário se tornar válido
   useEffect(() => {
@@ -493,7 +531,11 @@ function Identification() {
         <div className="identification-header-content">
           <div className="identification-logo">
             <div className="identification-logo-circle">
-              <img src={logoImage} alt="Queijaria do Mineiro" className="identification-logo-image" />
+              <img 
+                src={store?.customizations?.profileImageUrl || logoImage} 
+                alt={store?.name || "Queijaria do Mineiro"} 
+                className="identification-logo-image" 
+              />
             </div>
           </div>
           <div className="identification-total" ref={cartDropdownRef}>
@@ -775,161 +817,262 @@ function Identification() {
                   )}
                 </div>
 
-                <div className="identification-input-group">
-                  <input
-                    ref={cepInputRef}
-                    type="text"
-                    name="cep"
-                    className={`identification-input ${cepError ? 'identification-input-error' : ''}`}
-                    placeholder="CEP"
-                    value={formatCEP(formData.cep)}
-                    onChange={handleInputChange}
-                    maxLength={9}
-                  />
-                  {isLoadingCep && formData.cep.length === 8 && (
-                    <div className="identification-cep-loading">Buscando CEP...</div>
-                  )}
-                  {cepError && formData.cep.length === 8 && !isLoadingCep && (
-                    <div className="identification-cep-error">CEP não encontrado</div>
-                  )}
-                </div>
-                {(!cepData || isCepLinkVisible) && (
-                  <a 
-                    href="https://buscacepinter.correios.com.br/app/endereco/index.php?t" 
-                    target="_blank" 
-                    rel="noopener noreferrer" 
-                    className={`identification-cep-link ${!isCepLinkVisible ? 'fade-out' : ''}`}
-                  >
-                    Não sei meu CEP
-                  </a>
-                )}
-
-                {/* Campos de endereço e frete - aparecem quando CEP é encontrado */}
-                {cepData && !cepError && !isLoadingCep && (
+                {/* Renderizar baseado no tema do checkout */}
+                {store?.customizations?.checkoutTheme === 'local' ? (
+                  /* Tema Local - Formulário Simplificado */
                   <>
-                    {/* Opções de Frete */}
-                    <div className="identification-shipping-section">
-                      <div className="identification-shipping-options">
-                        <label className={`identification-shipping-option ${selectedShipping === 'free' ? 'selected' : ''}`}>
-                          <input
-                            type="radio"
-                            name="shipping"
-                            value="free"
-                            checked={selectedShipping === 'free'}
-                            onChange={(e) => setSelectedShipping(e.target.value)}
-                          />
-                          <div className="identification-shipping-option-content">
-                            <div className="identification-shipping-price">Grátis</div>
-                            <div className="identification-shipping-name">Envio por conta da casa!</div>
-                            <div className="identification-shipping-time">de 5 à 6 dias úteis</div>
-                          </div>
-                        </label>
-                        <label className={`identification-shipping-option ${selectedShipping === 'express' ? 'selected' : ''}`}>
-                          <input
-                            type="radio"
-                            name="shipping"
-                            value="express"
-                            checked={selectedShipping === 'express'}
-                            onChange={(e) => setSelectedShipping(e.target.value)}
-                          />
-                          <div className="identification-shipping-option-content">
-                            <div className="identification-shipping-price">R$12,90</div>
-                            <div className="identification-shipping-name">Valor do motoboy</div>
-                            <div className="identification-shipping-time">de 2 à 3 dias úteis</div>
-                          </div>
-                        </label>
-                      </div>
+                    <div className="identification-input-group">
+                      <svg className="identification-input-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="currentColor"/>
+                      </svg>
+                      <input
+                        type="text"
+                        name="street"
+                        className="identification-input identification-input-with-icon"
+                        placeholder="Endereço completo"
+                        value={formData.street}
+                        onChange={handleInputChange}
+                      />
                     </div>
 
-                    {/* Campos de Endereço */}
-                    <div className="identification-address-section">
-                      <div className="identification-address-field">
-                        <svg className="identification-address-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="currentColor"/>
-                        </svg>
-                        <span className="identification-address-text">{formData.street || 'Rua não informada'}</span>
-                      </div>
-
-                      <div className="identification-address-row">
-                        <div className="identification-input-group identification-input-group-number">
-                          <input
-                            type="text"
-                            name="number"
-                            className="identification-input"
-                            placeholder="Número"
-                            value={formData.number}
-                            onChange={handleInputChange}
-                            disabled={formData.hasNoNumber}
-                          />
-                          <label className="identification-checkbox-label">
-                            <input
-                              type="checkbox"
-                              name="hasNoNumber"
-                              checked={formData.hasNoNumber}
-                              onChange={(e) => {
-                                setFormData(prev => ({
-                                  ...prev,
-                                  hasNoNumber: e.target.checked,
-                                  number: e.target.checked ? '' : prev.number
-                                }));
-                              }}
-                            />
-                            <span>S/N</span>
-                          </label>
-                          {showValidationError && !formData.hasNoNumber && formData.number.trim() === '' && (
-                            <div className="identification-field-error">Informe o número</div>
-                          )}
-                        </div>
-                        <div className="identification-input-group identification-input-group-neighborhood">
-                          <input
-                            type="text"
-                            name="neighborhood"
-                            className="identification-input"
-                            placeholder="Bairro"
-                            value={formData.neighborhood}
-                            onChange={handleInputChange}
-                            readOnly
-                          />
-                        </div>
-                      </div>
-
-                      <div className="identification-input-group">
+                    <div className="identification-address-row">
+                      <div className="identification-input-group identification-input-group-number">
                         <input
                           type="text"
-                          name="complement"
+                          name="number"
                           className="identification-input"
-                          placeholder="Complemento"
-                          value={formData.complement}
+                          placeholder="Número"
+                          value={formData.number}
+                          onChange={handleInputChange}
+                          disabled={formData.hasNoNumber}
+                        />
+                        <label className="identification-checkbox-label">
+                          <input
+                            type="checkbox"
+                            name="hasNoNumber"
+                            checked={formData.hasNoNumber}
+                            onChange={(e) => {
+                              setFormData(prev => ({
+                                ...prev,
+                                hasNoNumber: e.target.checked,
+                                number: e.target.checked ? '' : prev.number
+                              }));
+                            }}
+                          />
+                          <span>S/N</span>
+                        </label>
+                        {showValidationError && !formData.hasNoNumber && formData.number.trim() === '' && (
+                          <div className="identification-field-error">Informe o número</div>
+                        )}
+                      </div>
+                      <div className="identification-input-group identification-input-group-neighborhood">
+                        <input
+                          type="text"
+                          name="neighborhood"
+                          className="identification-input"
+                          placeholder="Bairro"
+                          value={formData.neighborhood}
                           onChange={handleInputChange}
                         />
                       </div>
+                    </div>
 
-                      <div className="identification-address-row">
-                        <div className="identification-input-group">
-                          <input
-                            type="text"
-                            name="city"
-                            className="identification-input"
-                            placeholder="Cidade"
-                            value={formData.city}
-                            onChange={handleInputChange}
-                            readOnly
-                          />
-                        </div>
-                        <div className="identification-input-group identification-input-group-state">
-                          <input
-                            type="text"
-                            name="state"
-                            className="identification-input"
-                            placeholder="Estado"
-                            value={formData.state}
-                            onChange={handleInputChange}
-                            maxLength={2}
-                            readOnly
-                          />
-                        </div>
+                    <div className="identification-input-group">
+                      <input
+                        type="text"
+                        name="complement"
+                        className="identification-input"
+                        placeholder="Complemento (opcional)"
+                        value={formData.complement}
+                        onChange={handleInputChange}
+                      />
+                    </div>
+
+                    <div className="identification-address-row">
+                      <div className="identification-input-group">
+                        <input
+                          type="text"
+                          name="city"
+                          className="identification-input"
+                          placeholder="Cidade"
+                          value={formData.city}
+                          onChange={handleInputChange}
+                        />
+                      </div>
+                      <div className="identification-input-group identification-input-group-state">
+                        <input
+                          type="text"
+                          name="state"
+                          className="identification-input"
+                          placeholder="Estado (UF)"
+                          value={formData.state}
+                          onChange={handleInputChange}
+                          maxLength={2}
+                          style={{ textTransform: 'uppercase' }}
+                        />
                       </div>
                     </div>
+                  </>
+                ) : (
+                  /* Tema Ecommerce - Formulário Completo com CEP */
+                  <>
+                    <div className="identification-input-group">
+                      <input
+                        ref={cepInputRef}
+                        type="text"
+                        name="cep"
+                        className={`identification-input ${cepError ? 'identification-input-error' : ''}`}
+                        placeholder="CEP"
+                        value={formatCEP(formData.cep)}
+                        onChange={handleInputChange}
+                        maxLength={9}
+                      />
+                      {isLoadingCep && formData.cep.length === 8 && (
+                        <div className="identification-cep-loading">Buscando CEP...</div>
+                      )}
+                      {cepError && formData.cep.length === 8 && !isLoadingCep && (
+                        <div className="identification-cep-error">CEP não encontrado</div>
+                      )}
+                    </div>
+                    {(!cepData || isCepLinkVisible) && (
+                      <a 
+                        href="https://buscacepinter.correios.com.br/app/endereco/index.php?t" 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className={`identification-cep-link ${!isCepLinkVisible ? 'fade-out' : ''}`}
+                      >
+                        Não sei meu CEP
+                      </a>
+                    )}
+
+                    {/* Campos de endereço e frete - aparecem quando CEP é encontrado */}
+                    {cepData && !cepError && !isLoadingCep && (
+                      <>
+                        {/* Opções de Frete */}
+                        <div className="identification-shipping-section">
+                          <div className="identification-shipping-options">
+                            <label className={`identification-shipping-option ${selectedShipping === 'free' ? 'selected' : ''}`}>
+                              <input
+                                type="radio"
+                                name="shipping"
+                                value="free"
+                                checked={selectedShipping === 'free'}
+                                onChange={(e) => setSelectedShipping(e.target.value)}
+                              />
+                              <div className="identification-shipping-option-content">
+                                <div className="identification-shipping-price">Grátis</div>
+                                <div className="identification-shipping-name">Envio por conta da casa!</div>
+                                <div className="identification-shipping-time">de 5 à 6 dias úteis</div>
+                              </div>
+                            </label>
+                            <label className={`identification-shipping-option ${selectedShipping === 'express' ? 'selected' : ''}`}>
+                              <input
+                                type="radio"
+                                name="shipping"
+                                value="express"
+                                checked={selectedShipping === 'express'}
+                                onChange={(e) => setSelectedShipping(e.target.value)}
+                              />
+                              <div className="identification-shipping-option-content">
+                                <div className="identification-shipping-price">R$12,90</div>
+                                <div className="identification-shipping-name">Valor do motoboy</div>
+                                <div className="identification-shipping-time">de 2 à 3 dias úteis</div>
+                              </div>
+                            </label>
+                          </div>
+                        </div>
+
+                        {/* Campos de Endereço */}
+                        <div className="identification-address-section">
+                          <div className="identification-address-field">
+                            <svg className="identification-address-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="currentColor"/>
+                            </svg>
+                            <span className="identification-address-text">{formData.street || 'Rua não informada'}</span>
+                          </div>
+
+                          <div className="identification-address-row">
+                            <div className="identification-input-group identification-input-group-number">
+                              <input
+                                type="text"
+                                name="number"
+                                className="identification-input"
+                                placeholder="Número"
+                                value={formData.number}
+                                onChange={handleInputChange}
+                                disabled={formData.hasNoNumber}
+                              />
+                              <label className="identification-checkbox-label">
+                                <input
+                                  type="checkbox"
+                                  name="hasNoNumber"
+                                  checked={formData.hasNoNumber}
+                                  onChange={(e) => {
+                                    setFormData(prev => ({
+                                      ...prev,
+                                      hasNoNumber: e.target.checked,
+                                      number: e.target.checked ? '' : prev.number
+                                    }));
+                                  }}
+                                />
+                                <span>S/N</span>
+                              </label>
+                              {showValidationError && !formData.hasNoNumber && formData.number.trim() === '' && (
+                                <div className="identification-field-error">Informe o número</div>
+                              )}
+                            </div>
+                            <div className="identification-input-group identification-input-group-neighborhood">
+                              <input
+                                type="text"
+                                name="neighborhood"
+                                className="identification-input"
+                                placeholder="Bairro"
+                                value={formData.neighborhood}
+                                onChange={handleInputChange}
+                                readOnly
+                              />
+                            </div>
+                          </div>
+
+                          <div className="identification-input-group">
+                            <input
+                              type="text"
+                              name="complement"
+                              className="identification-input"
+                              placeholder="Complemento"
+                              value={formData.complement}
+                              onChange={handleInputChange}
+                            />
+                          </div>
+
+                          <div className="identification-address-row">
+                            <div className="identification-input-group">
+                              <input
+                                type="text"
+                                name="city"
+                                className="identification-input"
+                                placeholder="Cidade"
+                                value={formData.city}
+                                onChange={handleInputChange}
+                                readOnly
+                              />
+                            </div>
+                            <div className="identification-input-group identification-input-group-state">
+                              <input
+                                type="text"
+                                name="state"
+                                className="identification-input"
+                                placeholder="Estado"
+                                value={formData.state}
+                                onChange={handleInputChange}
+                                maxLength={2}
+                                readOnly
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </>
                 )}
               </div>

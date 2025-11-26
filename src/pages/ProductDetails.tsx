@@ -6,7 +6,7 @@ import { useCart } from '../contexts/CartContext';
 import { useStore } from '../contexts/StoreContext';
 import { useStoreNavigation } from '../hooks/useStoreNavigation';
 import { formatPrice } from '../utils/priceFormatter';
-import { formatProductTotalPrice, calculateAdditionalPrice } from '../utils/calculateProductPrice';
+import { formatProductTotalPrice, calculateAdditionalPrice, hasProductBasePrice } from '../utils/calculateProductPrice';
 import AddToCartPopup from '../components/AddToCartPopup';
 import ProductOptions from '../components/ProductOptions';
 import type { SelectedOptions } from '../types/productOptions';
@@ -118,8 +118,48 @@ function ProductDetails() {
   };
 
   const validateOptions = (): boolean => {
-    if (!product?.optionGroups || product.optionGroups.length === 0) {
-      return true; // Sem opções, sempre válido
+    if (!product) return false;
+
+    // Verificar se o produto tem preço base
+    const normalizePrice = (price: string): number => {
+      return Math.round(
+        parseFloat(
+          price
+            .replace(/R\$\s*/g, '')
+            .replace(/\./g, '')
+            .replace(',', '.')
+            .trim()
+        ) * 100
+      ) || 0;
+    };
+
+    const productBasePrice = normalizePrice(product.newPrice);
+    const hasBasePrice = productBasePrice > 0;
+
+    // Se o produto não tem preço base, é obrigatório ter opções e selecionar pelo menos uma
+    if (!hasBasePrice) {
+      if (!product.optionGroups || product.optionGroups.length === 0) {
+        return false; // Produto sem preço base precisa ter opções
+      }
+
+      // Verificar se pelo menos uma opção foi selecionada
+      let hasAnySelection = false;
+      for (const group of product.optionGroups) {
+        const selections = selectedOptions[group.id] || [];
+        if (selections.length > 0) {
+          hasAnySelection = true;
+          break;
+        }
+      }
+
+      if (!hasAnySelection) {
+        return false; // Precisa selecionar pelo menos uma opção
+      }
+    }
+
+    // Se não tem opções, sempre válido (desde que tenha preço base)
+    if (!product.optionGroups || product.optionGroups.length === 0) {
+      return true;
     }
 
     // Verificar se todas as opções obrigatórias foram preenchidas
@@ -142,7 +182,12 @@ function ProductDetails() {
 
     // Validar opções antes de adicionar ao carrinho
     if (!validateOptions()) {
-      alert('Por favor, complete todas as opções obrigatórias antes de continuar.');
+      const hasBasePrice = hasProductBasePrice(product);
+      if (!hasBasePrice) {
+        alert('Por favor, selecione pelo menos uma opção para continuar.');
+      } else {
+        alert('Por favor, complete todas as opções obrigatórias antes de continuar.');
+      }
       return;
     }
     
@@ -167,7 +212,12 @@ function ProductDetails() {
     
     // Validar opções antes de continuar
     if (!validateOptions()) {
-      alert('Por favor, complete todas as opções obrigatórias antes de continuar.');
+      const hasBasePrice = hasProductBasePrice(product);
+      if (!hasBasePrice) {
+        alert('Por favor, selecione pelo menos uma opção para continuar.');
+      } else {
+        alert('Por favor, complete todas as opções obrigatórias antes de continuar.');
+      }
       return;
     }
 
@@ -184,7 +234,12 @@ function ProductDetails() {
     
     // Validar opções antes de adicionar
     if (!validateOptions()) {
-      alert('Por favor, complete todas as opções obrigatórias antes de continuar.');
+      const hasBasePrice = hasProductBasePrice(product);
+      if (!hasBasePrice) {
+        alert('Por favor, selecione pelo menos uma opção para continuar.');
+      } else {
+        alert('Por favor, complete todas as opções obrigatórias antes de continuar.');
+      }
       return;
     }
 
@@ -279,26 +334,46 @@ function ProductDetails() {
           )}
 
           <div className="product-details-price-container">
-            {product.hasDiscount && product.oldPrice && product.oldPrice.trim() !== '' && product.oldPrice !== product.newPrice && (
-              <>
-                <span className="product-details-price-old">{formatPrice(product.oldPrice)}</span>
-                <span className="product-details-price-separator">|</span>
-              </>
-            )}
-            <span className="product-details-price-new">
-              {formatProductTotalPrice(product, selectedOptions)}
-            </span>
             {(() => {
+              const hasBasePrice = hasProductBasePrice(product);
               const additional = calculateAdditionalPrice(product, selectedOptions);
-              if (additional > 0) {
-                const additionalReais = additional / 100;
-                return (
-                  <span className="product-details-price-additional">
-                    (+ {formatPrice(additionalReais.toFixed(2).replace('.', ','))} de opções)
-                  </span>
-                );
+
+              // Se não tem preço base, mostrar apenas o preço das opções
+              if (!hasBasePrice) {
+                if (additional > 0) {
+                  return (
+                    <span className="product-details-price-new">
+                      {formatProductTotalPrice(product, selectedOptions)}
+                    </span>
+                  );
+                } else {
+                  return (
+                    <span className="product-details-price-new" style={{ color: '#999' }}>
+                      Selecione uma opção para ver o preço
+                    </span>
+                  );
+                }
               }
-              return null;
+
+              // Se tem preço base, mostrar normalmente
+              return (
+                <>
+                  {product.hasDiscount && product.oldPrice && product.oldPrice.trim() !== '' && product.oldPrice !== product.newPrice && (
+                    <>
+                      <span className="product-details-price-old">{formatPrice(product.oldPrice)}</span>
+                      <span className="product-details-price-separator">|</span>
+                    </>
+                  )}
+                  <span className="product-details-price-new">
+                    {formatProductTotalPrice(product, selectedOptions)}
+                  </span>
+                  {additional > 0 && (
+                    <span className="product-details-price-additional">
+                      (+ {formatPrice((additional / 100).toFixed(2).replace('.', ','))} de opções)
+                    </span>
+                  )}
+                </>
+              );
             })()}
           </div>
 

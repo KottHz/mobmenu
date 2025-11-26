@@ -1,11 +1,27 @@
 import { supabase } from '../lib/supabase';
 
+export interface OperatingDay {
+  day: 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
+  open: boolean;
+  openTime?: string;
+  closeTime?: string;
+}
+
 export interface UpdateStoreData {
   address?: string;
   openingHours?: string;
   closingTime?: string;
   description?: string;
   paymentMethods?: string[];
+  city?: string;
+  state?: string;
+  country?: string;
+  timezone?: string;
+  latitude?: number;
+  longitude?: number;
+  operatingDays?: OperatingDay[];
+  isClosed?: boolean;
+  appointmentOnlyMode?: boolean;
 }
 
 /**
@@ -54,6 +70,44 @@ export async function updateStoreInfo(
       updateData.payment_methods = data.paymentMethods && data.paymentMethods.length > 0
         ? JSON.stringify(data.paymentMethods)
         : null;
+    }
+
+    if (data.city !== undefined) {
+      updateData.city = data.city || null;
+    }
+
+    if (data.state !== undefined) {
+      updateData.state = data.state || null;
+    }
+
+    if (data.country !== undefined) {
+      updateData.country = data.country || null;
+    }
+
+    if (data.timezone !== undefined) {
+      updateData.timezone = data.timezone || null;
+    }
+
+    if (data.latitude !== undefined) {
+      updateData.latitude = data.latitude || null;
+    }
+
+    if (data.longitude !== undefined) {
+      updateData.longitude = data.longitude || null;
+    }
+
+    if (data.operatingDays !== undefined) {
+      updateData.operating_days = data.operatingDays && data.operatingDays.length > 0
+        ? JSON.stringify(data.operatingDays)
+        : null;
+    }
+
+    if (data.isClosed !== undefined) {
+      updateData.is_closed = data.isClosed;
+    }
+
+    if (data.appointmentOnlyMode !== undefined) {
+      updateData.appointment_only_mode = data.appointmentOnlyMode;
     }
 
     console.log('📤 [updateStoreInfo] Dados para atualização:', updateData);

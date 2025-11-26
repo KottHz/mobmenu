@@ -20,6 +20,8 @@ export default function AdminPersonalization() {
   const [message, setMessage] = useState('');
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
+  const [profileImagePreview, setProfileImagePreview] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
   const [imageToEdit, setImageToEdit] = useState<string | null>(null);
@@ -43,6 +45,10 @@ export default function AdminPersonalization() {
   const [promoBannerAnimation, setPromoBannerAnimation] = useState<string>('gradient');
   const [promoBannerAnimationSpeed, setPromoBannerAnimationSpeed] = useState<number>(1);
   const [savingPromoBanner, setSavingPromoBanner] = useState(false);
+
+  // Estado para tema do checkout
+  const [checkoutTheme, setCheckoutTheme] = useState<'ecommerce' | 'local'>('ecommerce');
+  const [savingCheckoutTheme, setSavingCheckoutTheme] = useState(false);
   
   // Estados para edição inline do texto do banner
   const [isEditingPromoText, setIsEditingPromoText] = useState(false);
@@ -82,6 +88,7 @@ export default function AdminPersonalization() {
   // Estado para botão flutuante
   const [showFixedButton, setShowFixedButton] = useState(true);
   const [savingFixedButton, setSavingFixedButton] = useState(false);
+
   
   // Refs para controle de salvamento dos produtos recomendados
   const isInitialRecommendedProductsLoadRef = useRef(true);
@@ -97,6 +104,7 @@ export default function AdminPersonalization() {
     promoBannerAnimation: string;
     promoBannerAnimationSpeed: number;
   } | null>(null);
+
 
   const previousColorsRef = useRef<{
     primaryColor: string;
@@ -120,6 +128,12 @@ export default function AdminPersonalization() {
       setLogoPreview(store.customizations.logoUrl);
     } else {
       setLogoPreview(null);
+    }
+
+    if (store?.customizations?.profileImageUrl) {
+      setProfileImagePreview(store.customizations.profileImageUrl);
+    } else {
+      setProfileImagePreview(null);
     }
     
     // Carregar valores do PromoBanner - usar exatamente os mesmos valores que o componente PromoBanner usa
@@ -145,6 +159,12 @@ export default function AdminPersonalization() {
       setPromoBannerAnimation(animation);
       setPromoBannerAnimationSpeed(animationSpeed);
 
+      // Carregar tema do checkout
+      const checkoutThemeToShow = (customization?.checkoutTheme === 'local' || customization?.checkoutTheme === 'ecommerce') 
+        ? customization.checkoutTheme 
+        : 'ecommerce';
+      setCheckoutTheme(checkoutThemeToShow);
+      
       // Atualizar valores anteriores quando carregar do banco (para evitar salvamento desnecessário)
       previousValuesRef.current = {
         promoBannerVisible: visible,
@@ -348,7 +368,7 @@ export default function AdminPersonalization() {
     };
     
     // Aguardar múltiplos frames para garantir que o DOM esteja completamente renderizado
-    let timeoutId: NodeJS.Timeout;
+    let timeoutId: ReturnType<typeof setTimeout>;
     let rafId: number;
     
     const scheduleCalculation = () => {
@@ -407,7 +427,7 @@ export default function AdminPersonalization() {
 
   // Ref para rastrear se é o carregamento inicial (não salvar na primeira renderização)
   const isInitialLoadRef = useRef(true);
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isSavingRef = useRef(false);
 
   // Salvar automaticamente quando os valores do banner mudarem
@@ -555,7 +575,7 @@ export default function AdminPersonalization() {
 
   // Ref para rastrear se é o carregamento inicial das cores
   const isInitialColorsLoadRef = useRef(true);
-  const saveColorsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const saveColorsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isSavingColorsRef = useRef(false);
 
   // Salvar automaticamente quando as cores mudarem
@@ -672,7 +692,7 @@ export default function AdminPersonalization() {
   }, [primaryColor, secondaryColor, backgroundColor, textColor, store?.id, storeLoading, authLoading, reloadCustomizations]);
 
   // Refs para timeout e controle de salvamento do botão de comprar
-  const saveBuyButtonTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const saveBuyButtonTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isSavingBuyButtonRef = useRef(false);
 
   // Salvar automaticamente quando showBuyButton mudar
@@ -1006,6 +1026,51 @@ export default function AdminPersonalization() {
   const handleClearAll = () => {
     if (confirm('Tem certeza que deseja remover todos os produtos recomendados?')) {
       setRecommendedProductIds([]);
+    }
+  };
+
+  // Função para salvar tema do checkout
+  const handleSaveCheckoutTheme = async (theme: 'ecommerce' | 'local') => {
+    if (!store?.id) return;
+
+    setSavingCheckoutTheme(true);
+    try {
+      const { data: existingCustomization } = await supabase
+        .from('store_customizations')
+        .select('id')
+        .eq('store_id', store.id)
+        .maybeSingle();
+
+      const updateData = {
+        checkout_theme: theme,
+        updated_at: new Date().toISOString()
+      };
+
+      if (existingCustomization) {
+        const { error: updateError } = await supabase
+          .from('store_customizations')
+          .update(updateData)
+          .eq('store_id', store.id);
+
+        if (updateError) throw updateError;
+      } else {
+        const { error: insertError } = await supabase
+          .from('store_customizations')
+          .insert({
+            store_id: store.id,
+            ...updateData
+          });
+
+        if (insertError) throw insertError;
+      }
+
+      setMessage('✅ Tema do checkout atualizado!');
+      await reloadCustomizations();
+    } catch (error: any) {
+      console.error('Erro ao salvar tema do checkout:', error);
+      setMessage(`❌ Erro ao salvar: ${error.message || 'Erro desconhecido'}`);
+    } finally {
+      setSavingCheckoutTheme(false);
     }
   };
 
@@ -2109,6 +2174,213 @@ export default function AdminPersonalization() {
           </div>
         </div>
 
+        {/* Seção de Foto de Perfil */}
+        <div className="form-container">
+          <h2>Foto de Perfil da Loja</h2>
+          <p className="form-description">
+            Escolha a foto de perfil que aparecerá no checkout/identificação. Esta imagem será exibida em formato circular.
+          </p>
+
+          <div className="form-group">
+            <div
+              className="image-upload-area"
+              onClick={() => {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = 'image/*';
+                input.onchange = async (e) => {
+                  const file = (e.target as HTMLInputElement).files?.[0];
+                  if (!file || !store?.id) return;
+
+                  setUploadingProfileImage(true);
+                  try {
+                    // Comprimir imagem se necessário
+                    const compressedFile = await compressImageIfNeeded(file, 800, 800, 0.9);
+                    
+                    // Upload para Supabase Storage
+                    const fileExt = compressedFile.name.split('.').pop();
+                    const fileName = `profile-${store.id}-${Date.now()}.${fileExt}`;
+                    const filePath = `stores/${store.id}/profile/${fileName}`;
+
+                    const { error: uploadError } = await supabase.storage
+                      .from('store-assets')
+                      .upload(filePath, compressedFile, {
+                        cacheControl: '3600',
+                        upsert: false
+                      });
+
+                    if (uploadError) throw uploadError;
+
+                    // Obter URL pública
+                    const { data: { publicUrl } } = supabase.storage
+                      .from('store-assets')
+                      .getPublicUrl(filePath);
+
+                    // Verificar se já existe customização
+                    const { data: existingCustomization } = await supabase
+                      .from('store_customizations')
+                      .select('profile_image_url')
+                      .eq('store_id', store.id)
+                      .maybeSingle();
+
+                    // Deletar imagem antiga se existir
+                    if (existingCustomization?.profile_image_url) {
+                      await deleteImageFromStorage(existingCustomization.profile_image_url);
+                    }
+
+                    if (existingCustomization) {
+                      // Atualizar existente
+                      const { error: updateError } = await supabase
+                        .from('store_customizations')
+                        .update({
+                          profile_image_url: publicUrl,
+                          updated_at: new Date().toISOString()
+                        })
+                        .eq('store_id', store.id);
+
+                      if (updateError) throw updateError;
+                    } else {
+                      // Criar novo
+                      const { error: insertError } = await supabase
+                        .from('store_customizations')
+                        .insert({
+                          store_id: store.id,
+                          profile_image_url: publicUrl
+                        });
+
+                      if (insertError) throw insertError;
+                    }
+
+                    setProfileImagePreview(publicUrl);
+                    setMessage('✅ Foto de perfil atualizada!');
+                    
+                    // Recarregar customizações
+                    await reloadCustomizations();
+                  } catch (error: any) {
+                    console.error('Erro ao fazer upload da foto de perfil:', error);
+                    setMessage(`❌ Erro ao fazer upload: ${error.message}`);
+                  } finally {
+                    setUploadingProfileImage(false);
+                  }
+                };
+                input.click();
+              }}
+              style={{
+                width: '200px',
+                height: '200px',
+                border: '2px dashed #ddd',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                backgroundColor: '#f9f9f9',
+                position: 'relative',
+                overflow: 'hidden',
+                margin: '0 auto'
+              }}
+            >
+              {profileImagePreview ? (
+                <>
+                  <img
+                    src={profileImagePreview}
+                    alt="Foto de perfil"
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      borderRadius: '50%'
+                    }}
+                  />
+                  {uploadingProfileImage && (
+                    <div style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      backgroundColor: 'rgba(0,0,0,0.5)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#fff',
+                      fontSize: '14px',
+                      borderRadius: '50%'
+                    }}>
+                      Carregando...
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '20px' }}>
+                  <img
+                    src={addImageIcon}
+                    alt="Adicionar foto"
+                    style={{ width: '48px', height: '48px', marginBottom: '12px', opacity: 0.5 }}
+                  />
+                  <p style={{ color: '#666', fontSize: '14px', margin: 0 }}>
+                    Clique para adicionar foto de perfil
+                  </p>
+                  <p style={{ color: '#999', fontSize: '12px', marginTop: '4px' }}>
+                    PNG, JPG (máx. 5MB)
+                  </p>
+                </div>
+              )}
+            </div>
+            {profileImagePreview && (
+              <button
+                onClick={async () => {
+                  if (!store?.id) return;
+                  if (!confirm('Tem certeza que deseja remover a foto de perfil?')) return;
+
+                  try {
+                    const { data: existingCustomization } = await supabase
+                      .from('store_customizations')
+                      .select('profile_image_url')
+                      .eq('store_id', store.id)
+                      .maybeSingle();
+
+                    if (existingCustomization?.profile_image_url) {
+                      await deleteImageFromStorage(existingCustomization.profile_image_url);
+                    }
+
+                    const { error: updateError } = await supabase
+                      .from('store_customizations')
+                      .update({
+                        profile_image_url: null,
+                        updated_at: new Date().toISOString()
+                      })
+                      .eq('store_id', store.id);
+
+                    if (updateError) throw updateError;
+
+                    setProfileImagePreview(null);
+                    setMessage('✅ Foto de perfil removida com sucesso!');
+                    
+                    await reloadCustomizations();
+                  } catch (error: any) {
+                    console.error('Erro ao remover foto de perfil:', error);
+                    setMessage(`❌ Erro ao remover: ${error.message || 'Erro desconhecido'}`);
+                  }
+                }}
+                style={{
+                  marginTop: '16px',
+                  padding: '8px 16px',
+                  fontSize: '14px',
+                  color: '#dc3545',
+                  background: 'transparent',
+                  border: '1px solid #dc3545',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontWeight: '500'
+                }}
+              >
+                Remover foto de perfil
+              </button>
+            )}
+          </div>
+        </div>
+
         {/* Seção de Personalização da Barra Promocional */}
         <div className="form-container">
           <h2>Barra Promocional</h2>
@@ -2384,6 +2656,95 @@ export default function AdminPersonalization() {
                 Salvando cores...
               </div>
             )}
+          </div>
+        </div>
+
+        {/* Seção de Tema do Checkout */}
+        <div className="form-container" style={{ marginTop: '30px', display: 'block' }}>
+          <h2>Tema do Checkout</h2>
+          <p className="form-description">
+            Escolha o formato do formulário de checkout. O tema "Ecommerce" inclui busca de CEP e campos completos. O tema "Delivery Local" é mais simples, ideal para entregas na mesma cidade.
+          </p>
+
+          <div className="form-group" style={{ alignItems: 'flex-start', textAlign: 'left' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%', maxWidth: '600px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <label style={{ fontSize: '16px', fontWeight: '600', color: '#333', marginBottom: '8px', display: 'block' }}>
+                  Tipo de Checkout
+                </label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <label style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '12px', 
+                    padding: '16px', 
+                    border: `2px solid ${checkoutTheme === 'ecommerce' ? '#007bff' : '#ddd'}`,
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    backgroundColor: checkoutTheme === 'ecommerce' ? '#f0f8ff' : '#fff',
+                    transition: 'all 0.2s'
+                  }}>
+                    <input
+                      type="radio"
+                      name="checkoutTheme"
+                      value="ecommerce"
+                      checked={checkoutTheme === 'ecommerce'}
+                      onChange={(e) => {
+                        setCheckoutTheme('ecommerce');
+                        handleSaveCheckoutTheme('ecommerce');
+                      }}
+                      style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+                    />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '16px', fontWeight: '600', color: '#333', marginBottom: '4px' }}>
+                        Ecommerce (Com CEP)
+                      </div>
+                      <div style={{ fontSize: '14px', color: '#666' }}>
+                        Formulário completo com busca de CEP, endereço completo e opções de frete. Ideal para vendas online.
+                      </div>
+                    </div>
+                  </label>
+
+                  <label style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '12px', 
+                    padding: '16px', 
+                    border: `2px solid ${checkoutTheme === 'local' ? '#007bff' : '#ddd'}`,
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    backgroundColor: checkoutTheme === 'local' ? '#f0f8ff' : '#fff',
+                    transition: 'all 0.2s'
+                  }}>
+                    <input
+                      type="radio"
+                      name="checkoutTheme"
+                      value="local"
+                      checked={checkoutTheme === 'local'}
+                      onChange={(e) => {
+                        setCheckoutTheme('local');
+                        handleSaveCheckoutTheme('local');
+                      }}
+                      style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+                    />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '16px', fontWeight: '600', color: '#333', marginBottom: '4px' }}>
+                        Delivery Local (Sem CEP)
+                      </div>
+                      <div style={{ fontSize: '14px', color: '#666' }}>
+                        Formulário simplificado sem busca de CEP. Apenas endereço básico. Ideal para entregas na mesma cidade.
+                      </div>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {savingCheckoutTheme && (
+                <div style={{ fontSize: '13px', color: '#666', fontStyle: 'italic' }}>
+                  Salvando configuração...
+                </div>
+              )}
+            </div>
           </div>
         </div>
 

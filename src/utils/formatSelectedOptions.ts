@@ -15,7 +15,7 @@ export function formatSelectedOptions(
     return '';
   }
 
-  const formattedOptions: string[] = [];
+  const allSelectedNames: string[] = [];
 
   for (const group of product.optionGroups) {
     const selectedIds = selectedOptions[group.id] || [];
@@ -28,12 +28,12 @@ export function formatSelectedOptions(
       })
       .filter((name): name is string => name !== null);
 
-    if (selectedNames.length > 0) {
-      formattedOptions.push(`${group.title}: ${selectedNames.join(', ')}`);
-    }
+    // Adicionar apenas os nomes das opções selecionadas, sem o título do grupo
+    allSelectedNames.push(...selectedNames);
   }
 
-  return formattedOptions.join(' | ');
+  // Retornar apenas os nomes das opções selecionadas, separados por vírgula
+  return allSelectedNames.join(', ');
 }
 
 

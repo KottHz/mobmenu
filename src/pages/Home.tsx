@@ -390,6 +390,7 @@ function Home({ previewMode = false }: HomeProps) {
                 hasDiscount={product.hasDiscount}
                 priority={index < 6}
                 previewMode={previewMode}
+                optionGroups={product.optionGroups}
               />
             ))
           ) : !isLoading ? (
@@ -444,6 +445,7 @@ function Home({ previewMode = false }: HomeProps) {
                     hasDiscount={product.hasDiscount}
                     priority={sectionStartIndex + index < 6} // Primeiros 6 produtos carregam imediatamente
                     previewMode={previewMode}
+                    optionGroups={product.optionGroups}
                   />
                 ))
               ) : (
@@ -477,6 +479,7 @@ function Home({ previewMode = false }: HomeProps) {
                 hasDiscount={product.hasDiscount}
                 priority={index < 6} // Primeiros 6 produtos carregam imediatamente (visíveis na tela)
                 previewMode={previewMode}
+                optionGroups={product.optionGroups}
                 />
               ))
             ) : !isLoading ? (
