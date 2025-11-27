@@ -21,11 +21,49 @@
   gap: 8px;
 }
 
+.store-info-icon-wrapper {
+  width: 20px;
+  height: 20px;
+  border-radius: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: transparent;
+}
+
+.store-info-icon-location {
+  background: transparent;
+}
+
+.store-info-icon-time {
+  background: transparent;
+}
+
 .store-info-icon {
   width: 16px;
   height: 16px;
   color: #6c757d;
   flex-shrink: 0;
+  opacity: 0.8;
+}
+
+.store-info-content {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.store-info-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #6c757d;
+  text-transform: none;
+  letter-spacing: 0;
+  line-height: 1.4;
 }
 
 .store-info-value {
@@ -34,7 +72,6 @@
   color: #212529;
   line-height: 1.4;
   word-wrap: break-word;
-  flex: 1;
 }
 
 .store-info-time-value {
@@ -42,17 +79,8 @@
   font-weight: 500;
 }
 
-.store-info-time-value.store-closed {
-  color: #dc3545;
-}
-
-.store-info-time-value.store-appointment {
-  color: #ffc107;
-}
-
 .store-info-more-button {
   margin-top: 0;
-  margin-left: 0;
   background: transparent;
   border: none;
   border-radius: 0;
@@ -61,19 +89,21 @@
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 6px;
+  justify-content: flex-start;
+  gap: 4px;
   transition: color 0.2s ease;
-  width: 100%;
-  text-align: left;
+  width: auto;
+  text-decoration: underline;
+  text-decoration-color: transparent;
 }
 
 .store-info-more-button:hover {
   background: transparent;
   border: none;
   color: #212529;
+  text-decoration-color: #212529;
 }
 
 .store-info-more-button:active {
@@ -85,7 +115,6 @@
   transition: transform 0.2s ease;
   width: 12px;
   height: 12px;
-  flex-shrink: 0;
 }
 
 .store-info-more-button:hover svg {
@@ -107,9 +136,18 @@
     gap: 6px;
   }
 
+  .store-info-icon-wrapper {
+    width: 18px;
+    height: 18px;
+  }
+
   .store-info-icon {
     width: 14px;
     height: 14px;
+  }
+
+  .store-info-label {
+    font-size: 11px;
   }
 
   .store-info-value {
@@ -136,9 +174,18 @@
     gap: 6px;
   }
 
+  .store-info-icon-wrapper {
+    width: 16px;
+    height: 16px;
+  }
+
   .store-info-icon {
     width: 12px;
     height: 12px;
+  }
+
+  .store-info-label {
+    font-size: 10px;
   }
 
   .store-info-value {

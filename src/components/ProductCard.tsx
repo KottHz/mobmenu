@@ -6,8 +6,6 @@ import { useStore } from '../contexts/StoreContext';
 import { useIntersectionObserver } from '../hooks/useIntersectionObserver';
 import { useStoreNavigation } from '../hooks/useStoreNavigation';
 import { formatPrice } from '../utils/priceFormatter';
-import { hasProductBasePrice, calculateMinimumOptionPrice } from '../utils/calculateProductPrice';
-import type { Product } from '../services/productService';
 import trashIcon from '../icons/trash-svgrepo-com.svg';
 import addIcon from '../icons/addicon.svg';
 import './ProductCard.css';
@@ -24,7 +22,6 @@ interface ProductCardProps {
   hasDiscount?: boolean;
   priority?: boolean; // Se true, carrega imediatamente (produtos acima da dobra)
   previewMode?: boolean; // Se true, desabilita navegação (para preview na página de personalização)
-  optionGroups?: Product['optionGroups']; // Grupos de opções do produto
 }
 
 const ProductCard: React.FC<ProductCardProps> = ({
@@ -39,7 +36,6 @@ const ProductCard: React.FC<ProductCardProps> = ({
   hasDiscount = false,
   priority = false,
   previewMode = false,
-  optionGroups,
 }) => {
   const { navigate } = useStoreNavigation();
   const { store } = useStore();
@@ -119,36 +115,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
   };
 
   const formattedOldPrice = useMemo(() => formatPrice(oldPrice), [oldPrice]);
-  
-  // Calcular preço a ser exibido
-  const displayPrice = useMemo(() => {
-    // Criar objeto produto temporário para usar nas funções
-    const product: Product = {
-      id: productId,
-      image,
-      title,
-      description1,
-      description2,
-      oldPrice,
-      newPrice,
-      hasDiscount,
-      optionGroups,
-    };
-
-    const hasBasePrice = hasProductBasePrice(product);
-    
-    // Se não tem preço base, mostrar o preço mínimo das opções
-    if (!hasBasePrice && optionGroups && optionGroups.length > 0) {
-      const minOptionPrice = calculateMinimumOptionPrice(product);
-      if (minOptionPrice > 0) {
-        const minPriceInReais = minOptionPrice / 100;
-        return formatPrice(minPriceInReais.toFixed(2).replace('.', ','));
-      }
-    }
-    
-    // Caso contrário, mostrar o preço normal
-    return formatPrice(newPrice);
-  }, [productId, image, title, description1, description2, oldPrice, newPrice, hasDiscount, optionGroups]);
+  const formattedNewPrice = useMemo(() => formatPrice(newPrice), [newPrice]);
 
   const handleProductClick = useCallback(() => {
     if (previewMode) return; // Não navegar em modo preview
@@ -373,13 +340,13 @@ const ProductCard: React.FC<ProductCardProps> = ({
             </>
           )}
           <div className="price-container" onClick={handleProductClick}>
-            {hasDiscount && formattedOldPrice && formattedOldPrice.trim() !== '' && formattedOldPrice !== displayPrice && (
+            {hasDiscount && formattedOldPrice && formattedOldPrice.trim() !== '' && formattedOldPrice !== formattedNewPrice && (
               <>
                 <span className="price-old">{formattedOldPrice}</span>
                 <span className="price-separator">|</span>
               </>
             )}
-            <span className="price-new">{displayPrice}</span>
+            <span className="price-new">{formattedNewPrice}</span>
           </div>
         </div>
         {store?.customizations?.showBuyButton !== false && (
