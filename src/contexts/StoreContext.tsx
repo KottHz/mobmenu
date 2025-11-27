@@ -6,6 +6,8 @@ import { supabase } from '../lib/supabase';
 interface StoreCustomizations {
   logoUrl?: string;
   logoAltText?: string;
+  profileImageUrl?: string; // Foto de perfil exibida no checkout
+  checkoutTheme?: 'ecommerce' | 'local'; // Tema do checkout
   promoBannerVisible: boolean;
   promoBannerText: string;
   promoBannerBgColor: string;
@@ -26,6 +28,13 @@ interface StoreCustomizations {
   showFixedButton: boolean; // Mostrar botão flutuante na página de produto
 }
 
+interface OperatingDay {
+  day: 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
+  open: boolean;
+  openTime?: string;
+  closeTime?: string;
+}
+
 interface Store {
   id: string;
   name: string;
@@ -41,6 +50,16 @@ interface Store {
   openingHours?: string;
   closingTime?: string;
   paymentMethods?: string[];
+  // Novos campos de localização e horários
+  city?: string;
+  state?: string;
+  country?: string;
+  timezone?: string;
+  latitude?: number;
+  longitude?: number;
+  operatingDays?: OperatingDay[];
+  isClosed?: boolean;
+  appointmentOnlyMode?: boolean;
 }
 
 interface StoreContextType {
@@ -292,6 +311,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }
         return data.payment_methods;
       })(),
+      city: data.city || undefined,
+      state: data.state || undefined,
+      country: data.country || undefined,
+      timezone: data.timezone || 'America/Sao_Paulo',
+      latitude: data.latitude ? parseFloat(data.latitude) : undefined,
+      longitude: data.longitude ? parseFloat(data.longitude) : undefined,
+      operatingDays: data.operating_days ? (Array.isArray(data.operating_days) ? data.operating_days : JSON.parse(data.operating_days)) : undefined,
+      isClosed: data.is_closed ?? false,
+      appointmentOnlyMode: data.appointment_only_mode ?? false,
     };
 
     setStore(storeData);
@@ -312,12 +340,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const customizations: StoreCustomizations = {
         logoUrl: data.logo_url,
         logoAltText: data.logo_alt_text,
+        profileImageUrl: data.profile_image_url,
+        checkoutTheme: (data.checkout_theme === 'local' || data.checkout_theme === 'ecommerce') ? data.checkout_theme : 'ecommerce',
         promoBannerVisible: data.promo_banner_visible ?? true,
         promoBannerText: data.promo_banner_text || 'ESQUENTA BLACK FRIDAY - ATÉ 60%OFF',
         promoBannerBgColor: data.promo_banner_bg_color || '#FDD8A7',
         promoBannerTextColor: data.promo_banner_text_color || '#000000',
         promoBannerUseGradient: data.promo_banner_use_gradient ?? true,
-        promoBannerAnimation: data.promo_banner_animation || 'gradient',
+        promoBannerAnimation: data.promo_banner_animation || 'blink',
         promoBannerAnimationSpeed: data.promo_banner_animation_speed ?? 1,
         primaryColor: data.primary_color || '#FF6B35',
         secondaryColor: data.secondary_color || '#004E89',
@@ -401,6 +431,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         openingHours: storeData.opening_hours || undefined,
         closingTime: storeData.closing_time || undefined,
         paymentMethods: storeData.payment_methods ? (Array.isArray(storeData.payment_methods) ? storeData.payment_methods : JSON.parse(storeData.payment_methods)) : undefined,
+        city: storeData.city || undefined,
+        state: storeData.state || undefined,
+        country: storeData.country || undefined,
+        timezone: storeData.timezone || 'America/Sao_Paulo',
+        latitude: storeData.latitude ? parseFloat(storeData.latitude) : undefined,
+        longitude: storeData.longitude ? parseFloat(storeData.longitude) : undefined,
+        operatingDays: storeData.operating_days ? (Array.isArray(storeData.operating_days) ? storeData.operating_days : JSON.parse(storeData.operating_days)) : undefined,
+        isClosed: storeData.is_closed ?? false,
+        appointmentOnlyMode: storeData.appointment_only_mode ?? false,
       };
 
       setStore(store);
@@ -446,6 +485,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         openingHours: storeData.opening_hours || undefined,
         closingTime: storeData.closing_time || undefined,
         paymentMethods: storeData.payment_methods ? (Array.isArray(storeData.payment_methods) ? storeData.payment_methods : JSON.parse(storeData.payment_methods)) : undefined,
+        city: storeData.city || undefined,
+        state: storeData.state || undefined,
+        country: storeData.country || undefined,
+        timezone: storeData.timezone || 'America/Sao_Paulo',
+        latitude: storeData.latitude ? parseFloat(storeData.latitude) : undefined,
+        longitude: storeData.longitude ? parseFloat(storeData.longitude) : undefined,
+        operatingDays: storeData.operating_days ? (Array.isArray(storeData.operating_days) ? storeData.operating_days : JSON.parse(storeData.operating_days)) : undefined,
+        isClosed: storeData.is_closed ?? false,
+        appointmentOnlyMode: storeData.appointment_only_mode ?? false,
       };
 
       setStore(updatedStore);

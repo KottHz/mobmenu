@@ -18,6 +18,10 @@ export default function ColorPicker({ value, onChange, label }: ColorPickerProps
   const isDraggingSaturation = useRef(false);
   const isDraggingHue = useRef(false);
   const isUserInteracting = useRef(false);
+  const [isEyeDropperActive, setIsEyeDropperActive] = useState(false);
+  const shouldIgnoreEyeDropperResult = useRef(false);
+  const eyeDropperButtonRef = useRef<HTMLButtonElement>(null);
+  const eyeDropperActivatedAt = useRef<number>(0);
 
   // Converter HSV para HEX
   const hsvToHex = (h: number, s: number, v: number) => {
@@ -293,6 +297,82 @@ export default function ColorPicker({ value, onChange, label }: ColorPickerProps
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
+  // Função para usar a pinça (EyeDropper API)
+  const handleEyeDropper = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Se a pinça já está ativa, desativar (ignorar próximo resultado)
+    if (isEyeDropperActive) {
+      shouldIgnoreEyeDropperResult.current = true;
+      setIsEyeDropperActive(false);
+      return;
+    }
+    
+    // Verificar se a API EyeDropper está disponível
+    if ('EyeDropper' in window) {
+      try {
+        setIsEyeDropperActive(true);
+        shouldIgnoreEyeDropperResult.current = false;
+        eyeDropperActivatedAt.current = Date.now();
+        
+        // Adicionar um pequeno delay para evitar capturar o clique do próprio botão
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Verificar novamente se ainda deve ignorar (usuário pode ter clicado no botão novamente durante o delay)
+        if (shouldIgnoreEyeDropperResult.current) {
+          setIsEyeDropperActive(false);
+          shouldIgnoreEyeDropperResult.current = false;
+          return;
+        }
+        
+        const eyeDropper = new (window as any).EyeDropper();
+        const result = await eyeDropper.open();
+        
+        // Se o resultado deve ser ignorado (usuário clicou no botão novamente), não aplicar
+        if (shouldIgnoreEyeDropperResult.current) {
+          setIsEyeDropperActive(false);
+          shouldIgnoreEyeDropperResult.current = false;
+          return;
+        }
+        
+        // Verificar se o clique foi muito rápido após ativar (provavelmente foi no próprio botão)
+        const timeSinceActivation = Date.now() - eyeDropperActivatedAt.current;
+        if (timeSinceActivation < 300) {
+          // Clique muito rápido, provavelmente foi no botão - ignorar
+          setIsEyeDropperActive(false);
+          shouldIgnoreEyeDropperResult.current = false;
+          return;
+        }
+        
+        if (result.sRGBHex) {
+          onChange(result.sRGBHex);
+          const hsv = hexToHsv(result.sRGBHex);
+          setHue(hsv.h);
+          setSaturation(hsv.s);
+          setLightness(hsv.v);
+          isUserInteracting.current = true;
+          setTimeout(() => {
+            isUserInteracting.current = false;
+          }, 100);
+        }
+        
+        setIsEyeDropperActive(false);
+        shouldIgnoreEyeDropperResult.current = false;
+      } catch (error: any) {
+        // Usuário cancelou ou erro
+        if (error.name !== 'AbortError') {
+          console.error('Erro ao usar pinça:', error);
+        }
+        setIsEyeDropperActive(false);
+        shouldIgnoreEyeDropperResult.current = false;
+      }
+    } else {
+      // Fallback: mostrar mensagem ou usar método alternativo
+      alert('A pinça de cor não está disponível no seu navegador. Use Chrome, Edge ou Opera para esta funcionalidade.');
+    }
+  };
+
   // Renderizar gradiente no canvas
   useEffect(() => {
     if (!canvasRef.current || !isOpen) return;
@@ -413,6 +493,42 @@ export default function ColorPicker({ value, onChange, label }: ColorPickerProps
                   top: `${(hue / 360) * 100}%`,
                 }}
               />
+            </div>
+          </div>
+          
+          {/* Botão de pinça */}
+          <div className="color-picker-actions">
+            <div style={{ position: 'relative' }}>
+              <button
+                ref={eyeDropperButtonRef}
+                type="button"
+                className={`color-picker-eyedropper ${isEyeDropperActive ? 'active' : ''}`}
+                onClick={handleEyeDropper}
+                title={isEyeDropperActive ? "Clique para desativar a pinça" : "Selecionar cor da tela (pinça)"}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" fill="currentColor"/>
+                  <path d="M12.5 7H11v6l5.25 3.15.75-1.23-4.5-2.67z" fill="currentColor"/>
+                  <path d="M16.5 18.5l-1.5-1.5 4-4 1.5 1.5-4 4z" fill="currentColor"/>
+                  <path d="M19.5 19.5l-1.5-1.5 1-1 1.5 1.5-1 1z" fill="currentColor"/>
+                </svg>
+                <span>Pinça</span>
+              </button>
+              {/* Overlay invisível para proteger o botão quando a pinça está ativa */}
+              {isEyeDropperActive && (
+                <div
+                  className="color-picker-eyedropper-overlay"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleEyeDropper(e);
+                  }}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
+                />
+              )}
             </div>
           </div>
         </div>

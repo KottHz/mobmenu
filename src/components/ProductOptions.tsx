@@ -133,7 +133,12 @@ const ProductOptions: React.FC<ProductOptionsProps> = ({
                 <span className="product-option-group-instruction">{group.instruction}</span>
                 <div className="product-option-group-status">
                   <span className={`product-option-count ${isComplete ? 'complete' : ''}`}>
-                    {selectionCount}/{minSelections}
+                    {selectionCount === 0 && maxSelections 
+                      ? `0/${maxSelections}`
+                      : maxSelections 
+                        ? `${selectionCount}/${maxSelections}`
+                        : `${selectionCount}/${minSelections}`
+                    }
                   </span>
                   {group.required && (
                     <span className="product-option-required">OBRIGATÓRIO</span>

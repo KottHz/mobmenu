@@ -30,7 +30,7 @@ const PromoBanner = () => {
   const bgColor = customization?.promoBannerBgColor || '#FDD8A7';
   const textColor = customization?.promoBannerTextColor || '#000000';
   const useGradient = customization?.promoBannerUseGradient ?? true;
-  const animation = (customization?.promoBannerAnimation && customization.promoBannerAnimation !== 'none') ? customization.promoBannerAnimation : 'gradient';
+  const animation = (customization?.promoBannerAnimation && customization.promoBannerAnimation !== 'none') ? customization.promoBannerAnimation : 'blink';
   const animationSpeed = customization?.promoBannerAnimationSpeed ?? 1;
   
   // Funções para edição inline
@@ -169,7 +169,8 @@ const PromoBanner = () => {
             }
           }}
           style={{
-            ...(!useGradient ? { color: textColor } : {}),
+            // Aplicar cor sempre, exceto para animações que usam gradiente (rotate)
+            color: animation !== 'rotate' ? textColor : undefined,
             ...(isAdminMode ? { cursor: 'pointer', userSelect: 'none' } : {}),
             ...(useGradient ? {
               '--animation-speed': animationSpeed

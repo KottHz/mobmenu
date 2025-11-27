@@ -48,19 +48,16 @@
 
 .promo-text.animation-blink {
   --base-duration: 1.5s;
-  color: inherit;
   animation: blink calc(var(--base-duration) / var(--animation-speed, 1)) ease-in-out infinite;
 }
 
 .promo-text.animation-slide {
   --base-duration: 3s;
-  color: inherit;
   animation: slide calc(var(--base-duration) / var(--animation-speed, 1)) ease-in-out infinite;
 }
 
 .promo-text.animation-pulse {
   --base-duration: 2s;
-  color: inherit;
   animation: pulse calc(var(--base-duration) / var(--animation-speed, 1)) ease-in-out infinite;
 }
 

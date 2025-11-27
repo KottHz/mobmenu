@@ -125,3 +125,63 @@
   left: auto;
 }
 
+.color-picker-actions {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #eee;
+  display: flex;
+  justify-content: center;
+}
+
+.color-picker-eyedropper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #333;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.color-picker-eyedropper:hover {
+  background: #e8e8e8;
+  border-color: #bbb;
+}
+
+.color-picker-eyedropper:active {
+  background: #ddd;
+  transform: scale(0.98);
+}
+
+.color-picker-eyedropper svg {
+  flex-shrink: 0;
+}
+
+.color-picker-eyedropper.active {
+  background: #007bff;
+  color: white;
+  border-color: #007bff;
+}
+
+.color-picker-eyedropper.active:hover {
+  background: #0056b3;
+  border-color: #0056b3;
+}
+
+/* Overlay invisível para proteger o botão quando a pinça está ativa */
+.color-picker-eyedropper-overlay {
+  position: absolute;
+  top: -10px;
+  left: -10px;
+  right: -10px;
+  bottom: -10px;
+  z-index: 10004;
+  cursor: pointer;
+  background: transparent;
+}
+

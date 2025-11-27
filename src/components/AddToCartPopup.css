@@ -145,20 +145,20 @@
 }
 
 .popup-btn-continue {
-  background-color: #FDD8A7;
-  color: #4A2C1A;
+  background-color: var(--store-primary-color, #FDD8A7);
+  color: var(--store-text-color, #4A2C1A);
 }
 
 .popup-btn-continue:hover {
-  background-color: #FCCF95;
+  filter: brightness(1.15);
 }
 
 .popup-btn-add {
-  background-color: #4A2C1A;
-  color: #FFFFFF;
+  background-color: var(--store-secondary-color, #4A2C1A);
+  color: var(--store-background-color, #FFFFFF);
 }
 
 .popup-btn-add:hover {
-  background-color: #5a3c2a;
+  filter: brightness(1.15);
 }
 
